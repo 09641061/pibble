@@ -29,6 +29,13 @@ public final class TestTenants {
         return new TestTenant(token, email, UUID.fromString(organizationId), membershipIn(token, organizationId));
     }
 
+    /** @return the first active establishment the member sees */
+    public static UUID firstEstablishmentOf(TestTenant tenant) {
+        String id = given().spec(tenant.spec()).get("/api/v1/establishments")
+                .then().statusCode(200).extract().path("[0].id");
+        return UUID.fromString(id);
+    }
+
     /** @return a user who signed in but belongs to no organization */
     public static String outsider() {
         return signIn(SignIn.newEmail());

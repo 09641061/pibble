@@ -44,6 +44,21 @@ public class Establishment {
         this.idempotencyKey = idempotencyKey;
     }
 
+    /**
+     * Changes the name, address and time zone. Existing appointments keep their instants; opening hours are read in
+     * the new zone (O7).
+     */
+    public void describe(String name, String address, IanaZone timeZone) {
+        this.name = requireName(name);
+        this.address = blankToNull(address);
+        this.timeZone = Objects.requireNonNull(timeZone, "timeZone is required");
+    }
+
+    /** O4: archiving frees the establishment's place in the plan. Archiving twice keeps the first instant. */
+    public void archive(Instant now) {
+        if (archivedAt == null) archivedAt = now;
+    }
+
     /** @return whether the establishment is open for business and counts toward the plan limit (O4) */
     public boolean isActive() {
         return archivedAt == null;
