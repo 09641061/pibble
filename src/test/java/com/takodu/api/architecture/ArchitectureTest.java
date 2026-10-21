@@ -11,8 +11,10 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
@@ -117,6 +119,12 @@ class ArchitectureTest {
             .because("an id from another organization must find nothing (takodu-tenancy)");
 
     @ArchTest
+    static final ArchRule assistant_tools_take_no_ids = methods()
+            .that().areAnnotatedWith("dev.langchain4j.agent.tool.Tool")
+            .should(takeNoIdentifiers())
+            .because("TurnScope binds the tenant before the model runs; the model never chooses an id (takodu-assistant)");
+
+    @ArchTest
     static final ArchRule controllers_are_named_controller = classes()
             .that().resideInAPackage("..interfaces.rest").and().areTopLevelClasses()
             .should().haveSimpleNameEndingWith("Controller");
@@ -218,6 +226,23 @@ class ArchitectureTest {
                 if (!scoped) {
                     events.add(SimpleConditionEvent.violated(method, method.getFullName()
                             + " is not scoped by organization; add an OrganizationId parameter or @CrossTenant"));
+                }
+            }
+        };
+    }
+
+    /** Neither a UUID or {@code *Id} type nor a parameter named {@code *Id} or {@code *Ids}. */
+    private static ArchCondition<JavaMethod> takeNoIdentifiers() {
+        return new ArchCondition<>("take no identifier parameters") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                boolean idType = method.getRawParameterTypes().stream().anyMatch(type ->
+                        type.isEquivalentTo(UUID.class) || type.getSimpleName().endsWith("Id"));
+                boolean idName = Arrays.stream(method.reflect().getParameters())
+                        .anyMatch(parameter -> parameter.getName().matches(".*(Id|Ids|ID)$"));
+                if (idType || idName) {
+                    events.add(SimpleConditionEvent.violated(method, method.getFullName()
+                            + " takes an identifier; take a name, a local date or a list position instead"));
                 }
             }
         };
