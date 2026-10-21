@@ -5,7 +5,7 @@ description: How to create and change the PostgreSQL schema of the pibble backen
 
 # Schema and migrations in pibble
 
-The schema is versioned SQL, and the database guards every invariant that concurrent requests can break. The decisions are [schema migrations](../../../docs/decisions/implemented/2026-10-19-schema-migrations.md) and [the database enforces concurrent invariants](../../../docs/decisions/proposed/2026-10-19-database-enforces-concurrent-invariants.md). The target tables are in the product docs (`../docs/schema.sql`, explained in `../docs/06-database-schema.md`).
+The schema is versioned SQL, and the database guards every invariant that concurrent requests can break. The decisions are [schema migrations](../../../docs/decisions/implemented/2026-10-19-schema-migrations.md) and [the database enforces concurrent invariants](../../../docs/decisions/implemented/2026-10-19-database-enforces-concurrent-invariants.md). The target tables are in the product docs (`../docs/schema.sql`, explained in `../docs/06-database-schema.md`).
 
 ## Setup
 
