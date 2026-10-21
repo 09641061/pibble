@@ -1,7 +1,7 @@
 package com.takodu.api.iam.infrastructure.persistence.jpa.adapters;
 
 import com.takodu.api.iam.domain.model.aggregates.LoginCode;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.iam.domain.repositories.LoginCodeRepository;
 import com.takodu.api.iam.infrastructure.persistence.jpa.assemblers.LoginCodePersistenceAssembler;
 import com.takodu.api.iam.infrastructure.persistence.jpa.repositories.LoginCodePersistenceRepository;

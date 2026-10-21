@@ -1,7 +1,7 @@
 package com.takodu.api.iam.infrastructure.devmail;
 
 import com.takodu.api.iam.application.internal.outboundservices.email.EmailSender;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.iam.domain.model.valueobjects.LoginCodeId;
 import io.quarkus.arc.profile.IfBuildProfile;
 import io.quarkus.logging.Log;

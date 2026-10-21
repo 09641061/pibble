@@ -12,7 +12,7 @@ import com.takodu.api.iam.domain.model.aggregates.User;
 import com.takodu.api.iam.domain.model.commands.RefreshSessionCommand;
 import com.takodu.api.iam.domain.model.commands.RevokeSessionCommand;
 import com.takodu.api.iam.domain.model.commands.SignInCommand;
-import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
+import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import com.takodu.api.iam.domain.repositories.LoginCodeRepository;
 import com.takodu.api.iam.domain.repositories.SessionRepository;
 import com.takodu.api.iam.domain.repositories.UserRepository;

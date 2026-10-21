@@ -1,7 +1,7 @@
 package com.takodu.api.iam.domain.model.aggregates;
 
 import com.takodu.api.iam.domain.exceptions.InvalidRefreshTokenException;
-import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
+import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import com.takodu.api.iam.domain.model.valueobjects.SessionId;
 import com.takodu.api.shared.domain.model.valueobjects.UserId;
 import lombok.Getter;
