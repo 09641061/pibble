@@ -54,7 +54,7 @@ Scheduled jobs use `quarkus-scheduler` and claim rows with `SELECT … FOR UPDAT
 
 ## Persistence
 
-Each table belongs to one context; foreign keys across contexts are allowed, but no context reads or writes another context's table. Invariants that concurrency can break are also database constraints, and the repository adapter translates their SQL state into a domain exception ([decision](decisions/proposed/2026-10-19-database-enforces-concurrent-invariants.md)). Migrations follow the [migrations decision](decisions/implemented/2026-10-19-schema-migrations.md).
+Each table belongs to one context; foreign keys across contexts are allowed, but no context reads or writes another context's table. Invariants that concurrency can break are also database constraints, and the repository adapter translates their SQL state into a domain exception ([decision](decisions/implemented/2026-10-19-database-enforces-concurrent-invariants.md)). Migrations follow the [migrations decision](decisions/implemented/2026-10-19-schema-migrations.md).
 
 ## HTTP errors
 

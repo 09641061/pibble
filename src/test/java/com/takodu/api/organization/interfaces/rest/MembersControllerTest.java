@@ -1,10 +1,11 @@
 package com.takodu.api.organization.interfaces.rest;
 
+import com.takodu.api.booking.interfaces.rest.AppointmentsControllerTest;
 import com.takodu.api.iam.application.internal.outboundservices.email.RecordingEmailSender;
 import com.takodu.api.iam.interfaces.rest.SignIn;
-import com.takodu.api.organization.application.internal.outboundservices.acl.FakeUpcomingAppointments;
 import com.takodu.api.organization.application.internal.outboundservices.email.RecordingInvitationSender;
 import com.takodu.api.shared.infrastructure.time.TestClock;
+import com.takodu.api.shared.testing.TestSalon;
 import com.takodu.api.shared.testing.TestTenant;
 import com.takodu.api.shared.testing.TestTenants;
 import io.quarkus.test.junit.QuarkusTest;
@@ -37,9 +38,6 @@ class MembersControllerTest {
 
     @Inject
     TestClock clock;
-
-    @Inject
-    FakeUpcomingAppointments upcomingAppointments;
 
     @AfterEach
     void resetClock() {
@@ -263,11 +261,31 @@ class MembersControllerTest {
 
     @Test
     void memberWithUpcomingAppointmentsIsNotRemoved() {
-        var owner = TestTenants.owner();
-        var staff = TestTenants.staffOf(owner);
-        upcomingAppointments.book(staff.memberId());
+        var salon = TestSalon.open();
+        var staff = salon.hireStaff();
+        salon.performedBy(staff);
+        String appointment = AppointmentsControllerTest.book(salon.owner(), UUID.randomUUID(),
+                AppointmentsControllerTest.body(salon, staff.memberId(), TestSalon.at(clock, 1, "10:00")))
+                .statusCode(201).extract().path("id");
 
-        remove(owner, staff.memberId()).statusCode(422).body("code", equalTo("MEMBER_HAS_UPCOMING_APPOINTMENTS"));
+        remove(salon.owner(), staff.memberId()).statusCode(422).body("code", equalTo("MEMBER_HAS_UPCOMING_APPOINTMENTS"));
+
+        given().spec(salon.owner().spec()).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType("application/json").body(Map.of("reason", "Deja el equipo"))
+                .post("/api/v1/appointments/" + appointment + "/cancellations").then().statusCode(200);
+        remove(salon.owner(), staff.memberId()).statusCode(204);
+    }
+
+    @Test
+    void pastAppointmentsDoNotKeepAMember() {
+        var salon = TestSalon.open();
+        var staff = salon.hireStaff();
+        salon.performedBy(staff);
+        AppointmentsControllerTest.book(salon.owner(), UUID.randomUUID(),
+                AppointmentsControllerTest.body(salon, staff.memberId(), TestSalon.at(clock, 1, "10:00"))).statusCode(201);
+        clock.advance(Duration.ofDays(2));
+
+        remove(salon.owner(), staff.memberId()).statusCode(204);
     }
 
     @Test

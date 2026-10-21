@@ -4,6 +4,7 @@ import com.takodu.api.organization.application.queryservices.MemberQueryService;
 import com.takodu.api.organization.domain.model.aggregates.Member;
 import com.takodu.api.organization.domain.model.queries.GetActiveMembershipQuery;
 import com.takodu.api.organization.domain.model.queries.GetCurrentMembersQuery;
+import com.takodu.api.organization.domain.model.queries.GetMemberByIdQuery;
 import com.takodu.api.organization.domain.repositories.MemberRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -26,5 +27,10 @@ public class MemberQueryServiceImpl implements MemberQueryService {
     @Override
     public List<Member> handle(GetCurrentMembersQuery query) {
         return memberRepository.findCurrent(query.organizationId());
+    }
+
+    @Override
+    public Optional<Member> handle(GetMemberByIdQuery query) {
+        return memberRepository.findCurrentById(query.organizationId(), query.memberId());
     }
 }
