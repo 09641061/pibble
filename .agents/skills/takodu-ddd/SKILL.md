@@ -110,7 +110,7 @@ Never throw `jakarta.ws.rs.*Exception`, return `null` for a business failure, or
 - Request resources carry Bean Validation annotations and the controller parameter is `@Valid`. Response resources are flat records of primitives and strings.
 - Every endpoint has `@Operation`, one `@APIResponse` per status it can return, and `@Tag` on the class.
 - Single lookups end with `.orElseThrow(() -> new <Aggregate>NotFoundException(id))`.
-- Every POST a person can retry takes the `@HeaderParam("Idempotency-Key") UUID` and passes it into the command as `IdempotencyKey`; creations store it on the row and return the existing aggregate on a repeat, transitions keep `lastIdempotencyKey` and return the current state on a repeat ([decision](../../../docs/decisions/proposed/2026-10-20-idempotency-keys-on-retried-requests.md)).
+- Every POST takes `@HeaderParam("Idempotency-Key") UUID` into the command's `IdempotencyKey`, or states why a repeat is harmless in `@WithoutIdempotencyKey("…")` **[enforced]**. Creations store the key and return the existing aggregate on a repeat; transitions keep `lastIdempotencyKey` and return the current state ([decision](../../../docs/decisions/proposed/2026-10-20-idempotency-keys-on-retried-requests.md)).
 - Fields that grant authority (organization, role, owner, `createdBy`) never come from a request body; the controller reads them from `TenantContext` and puts them in the command.
 
 ## Review checklist

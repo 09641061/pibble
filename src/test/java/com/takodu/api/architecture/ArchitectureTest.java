@@ -125,6 +125,12 @@ class ArchitectureTest {
             .because("TurnScope binds the tenant before the model runs; the model never chooses an id (takodu-assistant)");
 
     @ArchTest
+    static final ArchRule post_endpoints_take_an_idempotency_key = methods()
+            .that().areAnnotatedWith("jakarta.ws.rs.POST")
+            .should(takeAnIdempotencyKeyHeader())
+            .because("a retried tap must have one effect (docs/decisions/proposed/2026-10-20-idempotency-keys-on-retried-requests.md)");
+
+    @ArchTest
     static final ArchRule controllers_are_named_controller = classes()
             .that().resideInAPackage("..interfaces.rest").and().areTopLevelClasses()
             .should().haveSimpleNameEndingWith("Controller");
@@ -243,6 +249,28 @@ class ArchitectureTest {
                 if (idType || idName) {
                     events.add(SimpleConditionEvent.violated(method, method.getFullName()
                             + " takes an identifier; take a name, a local date or a list position instead"));
+                }
+            }
+        };
+    }
+
+    /** A {@code @HeaderParam("Idempotency-Key") UUID} parameter, or {@code @WithoutIdempotencyKey} on the method. */
+    private static ArchCondition<JavaMethod> takeAnIdempotencyKeyHeader() {
+        return new ArchCondition<>("take @HeaderParam(\"Idempotency-Key\") UUID or be @WithoutIdempotencyKey") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                if (method.isAnnotatedWith(BASE + ".shared.interfaces.rest.idempotency.WithoutIdempotencyKey")) {
+                    return;
+                }
+                boolean hasKey = method.getParameters().stream().anyMatch(parameter ->
+                        parameter.getRawType().isEquivalentTo(UUID.class)
+                                && parameter.tryGetAnnotationOfType("jakarta.ws.rs.HeaderParam")
+                                .flatMap(header -> header.get("value"))
+                                .filter("Idempotency-Key"::equals)
+                                .isPresent());
+                if (!hasKey) {
+                    events.add(SimpleConditionEvent.violated(method, method.getFullName()
+                            + " is a POST without @HeaderParam(\"Idempotency-Key\") UUID or @WithoutIdempotencyKey"));
                 }
             }
         };
