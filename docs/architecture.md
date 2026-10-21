@@ -50,7 +50,7 @@ In-transaction listeners write only their own tables, so a failure rolls back th
 
 A request passes JWT verification, then `organization`'s `TenantFilter` loads the caller's active membership for the `X-Organization-Id` header into `TenantContext` or answers 403. Command services check `AccessPolicy` before loading the aggregate. Webhooks and scheduled jobs have no `TenantContext`; they derive the organization from the WhatsApp line or the appointment. The rules are in the [tenancy decision](decisions/implemented/2026-10-19-tenancy-and-fixed-roles.md).
 
-Scheduled jobs use `quarkus-scheduler` and claim rows with `SELECT … FOR UPDATE SKIP LOCKED`; outgoing WhatsApp messages and assistant turns are rows in their context's tables ([decision](decisions/proposed/2026-10-19-webhooks-store-first-and-polled-outbox.md)). Every external system (Meta, the LLM provider, Resend) sits behind a port in `application.internal.outboundservices`.
+Scheduled jobs use `quarkus-scheduler` and claim rows with `SELECT … FOR UPDATE SKIP LOCKED`; outgoing WhatsApp messages and assistant turns are rows in their context's tables ([decision](decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md)). Every external system (Meta, the LLM provider, Resend) sits behind a port in `application.internal.outboundservices`.
 
 ## Persistence
 
