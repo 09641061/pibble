@@ -16,6 +16,7 @@ Backend of Takodu: a Quarkus REST API (Java 25, PostgreSQL) organized as a modul
 - API: `http://localhost:8080/api/v1/...`
 - Swagger UI: `http://localhost:8080/q/swagger-ui`
 - Dev UI: `http://localhost:8080/q/dev-ui`
+- Sign in locally: `POST /api/v1/auth/login-codes` with any email; dev mode prints the code to the console instead of emailing it.
 
 ## Tests
 
@@ -27,7 +28,7 @@ scripts/check-docs.sh              # documentation
 
 ## Production
 
-The `prod` profile reads the database settings from environment variables; [.env.example](.env.example) lists them. Quarkus loads a `.env` file at the root if it exists; never commit it.
+The `prod` profile reads the database, Resend and JWT key settings from environment variables; [.env.example](.env.example) lists them. Quarkus loads a `.env` file at the root if it exists; never commit it.
 
 ```sh
 ./mvnw package
