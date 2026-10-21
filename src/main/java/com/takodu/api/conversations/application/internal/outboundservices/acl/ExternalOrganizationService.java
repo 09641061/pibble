@@ -1,9 +1,12 @@
 package com.takodu.api.conversations.application.internal.outboundservices.acl;
 
 import com.takodu.api.conversations.domain.exceptions.EstablishmentNotFoundException;
+import com.takodu.api.conversations.domain.exceptions.MemberNotAtEstablishmentException;
+import com.takodu.api.conversations.domain.exceptions.MemberNotFoundException;
 import com.takodu.api.conversations.domain.model.valueobjects.EstablishmentState;
 import com.takodu.api.organization.interfaces.acl.OrganizationContextFacade;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
+import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -21,5 +24,15 @@ public class ExternalOrganizationService {
         var view = organizationContextFacade.fetchCalendar(organizationId.value(), establishmentId.value())
                 .orElseThrow(() -> new EstablishmentNotFoundException(establishmentId));
         return new EstablishmentState(establishmentId, view.archived(), view.planActive());
+    }
+
+    /**
+     * @throws MemberNotFoundException when the member is removed, still invited or not in the organization
+     * @throws MemberNotAtEstablishmentException when the member cannot see the establishment's inbox (O13)
+     */
+    public void requireMemberWorksAt(OrganizationId organizationId, MemberId memberId, EstablishmentId establishmentId) {
+        var member = organizationContextFacade.fetchMember(organizationId.value(), memberId.value(), establishmentId.value())
+                .orElseThrow(() -> new MemberNotFoundException(memberId));
+        if (!member.worksThere()) throw new MemberNotAtEstablishmentException(memberId);
     }
 }

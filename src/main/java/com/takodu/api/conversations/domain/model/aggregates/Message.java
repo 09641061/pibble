@@ -12,6 +12,7 @@ import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import lombok.Getter;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -47,6 +48,25 @@ public class Message {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.IN,
                 MessageOrigin.CUSTOMER, Objects.requireNonNull(wamid, "wamid is required"), content, null,
                 DeliveryStatus.RECEIVED, null, null, null, null, 0, null, null, at);
+    }
+
+    /** WhatsApp's limit for a text message. */
+    public static final int MAX_TEXT = 4096;
+    /** The first retry waits this long; each next one waits twice as long (30 s, 1 min, 2 min, 4 min). */
+    public static final Duration FIRST_RETRY = Duration.ofSeconds(30);
+
+    /**
+     * W6, W7: a staff reply, queued as the outbox row the sender job delivers.
+     *
+     * @throws IllegalArgumentException when the text is blank or longer than 4,096 characters
+     */
+    public static Message staffText(Conversation conversation, MemberId sentBy, String body, Instant now,
+                                    IdempotencyKey idempotencyKey) {
+        if (body == null || body.isBlank()) throw new IllegalArgumentException("Write a message");
+        if (body.length() > MAX_TEXT) throw new IllegalArgumentException("A message has at most 4096 characters");
+        return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
+                MessageOrigin.STAFF, null, MessageContent.text(body), null, DeliveryStatus.PENDING, null, null, null,
+                Objects.requireNonNull(sentBy, "Staff messages record who sent them"), 0, now, idempotencyKey, now);
     }
 
     /** W5: the owner replied from the WhatsApp Business app; WhatsApp already sent it. */
@@ -92,6 +112,42 @@ public class Message {
         this.nextAttemptAt = nextAttemptAt;
         this.idempotencyKey = idempotencyKey;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt is required");
+    }
+
+    /** Meta accepted the message. */
+    public void markSent(Wamid wamid) {
+        this.wamid = Objects.requireNonNull(wamid, "wamid is required");
+        this.status = status.advanceTo(DeliveryStatus.SENT);
+        this.nextAttemptAt = null;
+        this.attempts++;
+    }
+
+    /**
+     * W14: a send that failed is retried later, with backoff, until the fifth attempt; then the message is shown
+     * failed in the inbox. A failure Meta will repeat, such as a closed window, fails at once.
+     *
+     * @param retryable whether trying again may succeed, as after a timeout or Meta's rate limit
+     */
+    public void recordSendFailure(String error, boolean retryable, Instant now) {
+        attempts++;
+        this.error = error;
+        if (!retryable || attempts >= MAX_ATTEMPTS) {
+            fail(error);
+            return;
+        }
+        nextAttemptAt = now.plus(FIRST_RETRY.multipliedBy(1L << (attempts - 1)));
+    }
+
+    /** The rule that allowed the send no longer holds (line disconnected, plan inactive, window closed). */
+    public void fail(String reason) {
+        status = status.advanceTo(DeliveryStatus.FAILED);
+        error = reason;
+        nextAttemptAt = null;
+    }
+
+    /** @return whether the outbox still has to send it */
+    public boolean isPending() {
+        return status == DeliveryStatus.PENDING;
     }
 
     /**

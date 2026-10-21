@@ -2,6 +2,7 @@ package com.takodu.api.conversations.infrastructure.meta;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
@@ -10,6 +11,8 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+
+import java.util.Map;
 
 /**
  * The Graph API calls Takodu makes for WhatsApp, checked against Meta's docs on 2026-10-21. The version is
@@ -52,6 +55,12 @@ public interface MetaGraphClient {
     @Path("/{version}/{phoneNumberId}/register")
     void register(@PathParam("version") String version, @PathParam("phoneNumberId") String phoneNumberId,
                   @HeaderParam("Authorization") String authorization, RegisterRequest request);
+
+    /** @param payload a Cloud API message, such as a text with {@code to}, {@code type} and {@code text.body} */
+    @POST
+    @Path("/{version}/{phoneNumberId}/messages")
+    JsonNode sendMessage(@PathParam("version") String version, @PathParam("phoneNumberId") String phoneNumberId,
+                         @HeaderParam("Authorization") String authorization, Map<String, Object> payload);
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record AccessTokenResponse(@JsonProperty("access_token") String accessToken) { }
