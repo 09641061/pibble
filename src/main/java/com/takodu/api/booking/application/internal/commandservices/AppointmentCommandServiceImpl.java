@@ -3,9 +3,14 @@ package com.takodu.api.booking.application.internal.commandservices;
 import com.takodu.api.booking.application.commandservices.AppointmentCommandService;
 import com.takodu.api.booking.application.internal.outboundservices.acl.ExternalCustomersService;
 import com.takodu.api.booking.application.internal.outboundservices.acl.ExternalOrganizationService;
+import com.takodu.api.booking.domain.exceptions.AppointmentNotFoundException;
 import com.takodu.api.booking.domain.exceptions.ServiceNotBookableException;
 import com.takodu.api.booking.domain.model.aggregates.Appointment;
 import com.takodu.api.booking.domain.model.commands.BookAppointmentCommand;
+import com.takodu.api.booking.domain.model.commands.CancelAppointmentCommand;
+import com.takodu.api.booking.domain.model.commands.ChangeAppointmentStatusCommand;
+import com.takodu.api.booking.domain.model.commands.RescheduleAppointmentCommand;
+import com.takodu.api.booking.domain.model.valueobjects.AppointmentId;
 import com.takodu.api.booking.domain.model.valueobjects.EstablishmentCalendar;
 import com.takodu.api.booking.domain.model.valueobjects.ServiceOffer;
 import com.takodu.api.booking.domain.repositories.AppointmentRepository;
@@ -13,6 +18,8 @@ import com.takodu.api.booking.domain.repositories.TimeBlockRepository;
 import com.takodu.api.booking.domain.services.AvailabilityPolicy;
 import com.takodu.api.booking.domain.services.BookingContext;
 import com.takodu.api.booking.interfaces.events.AppointmentBookedIntegrationEvent;
+import com.takodu.api.booking.interfaces.events.AppointmentCancelledIntegrationEvent;
+import com.takodu.api.booking.interfaces.events.AppointmentRescheduledIntegrationEvent;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
 import com.takodu.api.shared.application.tenancy.Action;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
@@ -38,6 +45,8 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
     private final ExternalCustomersService externalCustomersService;
     private final AccessPolicy accessPolicy;
     private final Event<AppointmentBookedIntegrationEvent> appointmentBooked;
+    private final Event<AppointmentRescheduledIntegrationEvent> appointmentRescheduled;
+    private final Event<AppointmentCancelledIntegrationEvent> appointmentCancelled;
     private final Clock clock;
     private final AvailabilityPolicy availabilityPolicy = new AvailabilityPolicy();
 
@@ -45,13 +54,17 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
                                          TimeBlockRepository timeBlockRepository,
                                          ExternalOrganizationService externalOrganizationService,
                                          ExternalCustomersService externalCustomersService, AccessPolicy accessPolicy,
-                                         Event<AppointmentBookedIntegrationEvent> appointmentBooked, Clock clock) {
+                                         Event<AppointmentBookedIntegrationEvent> appointmentBooked,
+                                         Event<AppointmentRescheduledIntegrationEvent> appointmentRescheduled,
+                                         Event<AppointmentCancelledIntegrationEvent> appointmentCancelled, Clock clock) {
         this.appointmentRepository = appointmentRepository;
         this.timeBlockRepository = timeBlockRepository;
         this.externalOrganizationService = externalOrganizationService;
         this.externalCustomersService = externalCustomersService;
         this.accessPolicy = accessPolicy;
         this.appointmentBooked = appointmentBooked;
+        this.appointmentRescheduled = appointmentRescheduled;
+        this.appointmentCancelled = appointmentCancelled;
         this.clock = clock;
     }
 
@@ -81,6 +94,61 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
                 appointment.getId().value(), appointment.getEstablishmentId().value(), appointment.getCustomerId().value(),
                 appointment.getStaffMemberId().value(), appointment.getServiceId().value(), appointment.getRange().start(),
                 appointment.getRange().end(), appointment.getSource().name().toLowerCase(Locale.ROOT)));
+        return appointment;
+    }
+
+    @Override
+    @Transactional
+    public Appointment handle(RescheduleAppointmentCommand command) {
+        var appointment = load(command.organizationId(), command.appointmentId());
+        if (appointment.alreadyApplied(command.idempotencyKey())) return appointment;
+        var calendar = externalOrganizationService.fetchCalendar(command.organizationId(), appointment.getEstablishmentId());
+        if (!calendar.planActive()) throw new PlanInactiveException(command.organizationId().value());
+        var service = externalOrganizationService.fetchServiceOffer(command.organizationId(), appointment.getServiceId());
+        var member = command.staffMemberId() == null ? appointment.getStaffMemberId() : command.staffMemberId();
+
+        appointment.reschedule(member, command.start(), command.idempotencyKey());
+        var context = loadContext(command.organizationId(), calendar, service, List.of(member),
+                appointment.getCustomerId(), appointment.getRange());
+        availabilityPolicy.ensureBookable(context, appointment.getCustomerId(), member, appointment.getRange(),
+                command.source(), appointment.getId());
+
+        var saved = appointmentRepository.save(appointment);
+        appointmentRescheduled.fire(new AppointmentRescheduledIntegrationEvent(command.organizationId().value(),
+                saved.getId().value(), saved.getEstablishmentId().value(), saved.getCustomerId().value(),
+                saved.getStaffMemberId().value(), saved.getRange().start(), saved.getRange().end()));
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public Appointment handle(CancelAppointmentCommand command) {
+        var appointment = load(command.organizationId(), command.appointmentId());
+        if (appointment.alreadyApplied(command.idempotencyKey())) return appointment;
+        appointment.cancel(command.reason(), command.cancelledBy(), command.idempotencyKey());
+        var saved = appointmentRepository.save(appointment);
+        appointmentCancelled.fire(new AppointmentCancelledIntegrationEvent(command.organizationId().value(),
+                saved.getId().value(), saved.getEstablishmentId().value(), saved.getCustomerId().value(),
+                saved.getRange().start(), saved.getCancelledBy().name().toLowerCase(Locale.ROOT),
+                saved.getCancelReason().value()));
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public Appointment handle(ChangeAppointmentStatusCommand command) {
+        var appointment = load(command.organizationId(), command.appointmentId());
+        if (appointment.alreadyApplied(command.idempotencyKey())) return appointment;
+        appointment.changeStatus(command.status(), clock.instant(), command.idempotencyKey());
+        return appointmentRepository.save(appointment);
+    }
+
+    /** Checks the caller before loading, then their establishment once the appointment names it (O13). */
+    private Appointment load(OrganizationId organizationId, AppointmentId appointmentId) {
+        accessPolicy.require(Action.BOOK_APPOINTMENTS);
+        var appointment = appointmentRepository.findById(organizationId, appointmentId)
+                .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
+        accessPolicy.requireEstablishment(appointment.getEstablishmentId());
         return appointment;
     }
 

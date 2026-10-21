@@ -2,6 +2,8 @@ package com.takodu.api.booking.interfaces.rest;
 
 import com.takodu.api.booking.RecordingBookingEvents;
 import com.takodu.api.booking.interfaces.events.AppointmentBookedIntegrationEvent;
+import com.takodu.api.booking.interfaces.events.AppointmentCancelledIntegrationEvent;
+import com.takodu.api.booking.interfaces.events.AppointmentRescheduledIntegrationEvent;
 import com.takodu.api.shared.infrastructure.time.TestClock;
 import com.takodu.api.shared.testing.TestSalon;
 import com.takodu.api.shared.testing.TestTenant;
@@ -233,6 +235,210 @@ public class AppointmentsControllerTest {
                 .statusCode(404).body("code", equalTo("CUSTOMER_NOT_FOUND"));
         get(salon.owner(), appointment).statusCode(404).body("code", equalTo("APPOINTMENT_NOT_FOUND"));
         calendar(salon.owner(), other.establishmentId()).statusCode(404);
+    }
+
+    @Test
+    void rescheduleMovesTheTimeAndTheMemberAndFreesTheOldSlot() {
+        var salon = TestSalon.open();
+        var staff = salon.hireStaff();
+        salon.performedBy(salon.owner(), staff);
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, salon.owner().memberId(), TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+        var later = TestSalon.at(clock, 2, "16:00");
+
+        transition(salon.owner(), id, "reschedulings", UUID.randomUUID(),
+                Map.of("staffMemberId", staff.memberId(), "start", later.toString()))
+                .statusCode(200)
+                .body("start", equalTo(later.toString()))
+                .body("end", equalTo(later.plus(Duration.ofHours(1)).toString()))
+                .body("staffMemberId", equalTo(staff.memberId().toString()));
+
+        assertInstanceOf(AppointmentRescheduledIntegrationEvent.class, events.about(UUID.fromString(id)).getLast());
+        book(salon.owner(), UUID.randomUUID(), body(salon.newCustomer(), salon, salon.owner().memberId(),
+                TestSalon.at(clock, 1, "10:00"))).statusCode(201);
+    }
+
+    @Test
+    void rescheduleKeepsTheMemberAndCanOverlapItsOwnOldTime() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(salon.owner(), id, "reschedulings", UUID.randomUUID(),
+                Map.of("start", TestSalon.at(clock, 1, "10:30").toString()))
+                .statusCode(200).body("staffMemberId", equalTo(salon.owner().memberId().toString()));
+    }
+
+    @Test
+    void rescheduleReRunsTheBookingRules() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+        book(salon.owner(), UUID.randomUUID(), body(salon.newCustomer(), salon, null, TestSalon.at(clock, 1, "12:00")))
+                .statusCode(201);
+
+        transition(salon.owner(), id, "reschedulings", UUID.randomUUID(),
+                Map.of("start", TestSalon.at(clock, 1, "11:30").toString()))
+                .statusCode(409).body("code", equalTo("SLOT_UNAVAILABLE"));
+        transition(salon.owner(), id, "reschedulings", UUID.randomUUID(),
+                Map.of("start", TestSalon.at(clock, 1, "17:30").toString()))
+                .statusCode(422).body("code", equalTo("OUTSIDE_OPENING_HOURS"));
+    }
+
+    @Test
+    void onlyConfirmedAppointmentsAreRescheduled() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "completed")).statusCode(200);
+
+        transition(salon.owner(), id, "reschedulings", UUID.randomUUID(),
+                Map.of("start", TestSalon.at(clock, 2, "10:00").toString()))
+                .statusCode(422).body("code", equalTo("INVALID_TRANSITION"));
+    }
+
+    @Test
+    void cancellingTwiceWithOneKeyReturnsTheCancelledAppointmentAndFreesTheSlot() {
+        var salon = TestSalon.open();
+        var ten = TestSalon.at(clock, 1, "10:00");
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, ten)).extract().path("id");
+        var key = UUID.randomUUID();
+
+        transition(salon.owner(), id, "cancellations", key, Map.of("reason", "Se enfermó"))
+                .statusCode(200)
+                .body("status", equalTo("cancelled"))
+                .body("cancelReason", equalTo("Se enfermó"))
+                .body("cancelledBy", equalTo("staff"));
+        transition(salon.owner(), id, "cancellations", key, Map.of("reason", "Se enfermó")).statusCode(200);
+        transition(salon.owner(), id, "cancellations", UUID.randomUUID(), Map.of("reason", "Otra vez"))
+                .statusCode(422).body("code", equalTo("INVALID_TRANSITION"));
+
+        var cancelled = events.about(UUID.fromString(id)).stream()
+                .filter(AppointmentCancelledIntegrationEvent.class::isInstance).toList();
+        assertEquals(1, cancelled.size());
+        book(salon.owner(), UUID.randomUUID(), body(salon, null, ten)).statusCode(201);
+    }
+
+    @Test
+    void staffRecordThatTheCustomerCancelled() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(salon.owner(), id, "cancellations", UUID.randomUUID(),
+                Map.of("reason", "Llamó para cancelar", "cancelledBy", "customer"))
+                .statusCode(200).body("cancelledBy", equalTo("customer"));
+    }
+
+    @Test
+    void cancellingNeedsAShortReason() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(salon.owner(), id, "cancellations", UUID.randomUUID(), Map.of("reason", " ")).statusCode(400);
+        transition(salon.owner(), id, "cancellations", UUID.randomUUID(), Map.of("reason", "x".repeat(501)))
+                .statusCode(400);
+        transition(salon.owner(), id, "cancellations", UUID.randomUUID(), Map.of("reason", "Viaje", "cancelledBy", "robot"))
+                .statusCode(400);
+    }
+
+    @Test
+    void appointmentStartsAndCompletes() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "in_progress"))
+                .statusCode(200).body("status", equalTo("in_progress"));
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "completed"))
+                .statusCode(200).body("status", equalTo("completed"));
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "in_progress"))
+                .statusCode(422).body("code", equalTo("INVALID_TRANSITION"));
+    }
+
+    @Test
+    void noShowOnlyAfterTheStart() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "no_show"))
+                .statusCode(422).body("code", equalTo("NO_SHOW_BEFORE_START"));
+        clock.set(TestSalon.at(clock, 1, "10:20"));
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "no_show"))
+                .statusCode(200).body("status", equalTo("no_show"));
+    }
+
+    @Test
+    void statusChangesDoNotCancel() {
+        var salon = TestSalon.open();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "cancelled")).statusCode(400);
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "done")).statusCode(400);
+    }
+
+    @Test
+    void inactivePlanStopsReschedulingButNotStatusChanges() {
+        var salon = TestSalon.open();
+        String first = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+        String second = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "12:00")))
+                .extract().path("id");
+        clock.advance(Duration.ofDays(15));
+
+        transition(salon.owner(), first, "reschedulings", UUID.randomUUID(),
+                Map.of("start", TestSalon.at(clock, 1, "10:00").toString()))
+                .statusCode(402).body("code", equalTo("PLAN_INACTIVE"));
+        transition(salon.owner(), first, "status-changes", UUID.randomUUID(), Map.of("status", "completed"))
+                .statusCode(200);
+        transition(salon.owner(), second, "cancellations", UUID.randomUUID(), Map.of("reason", "Cerramos"))
+                .statusCode(200);
+    }
+
+    @Test
+    void staffChangeOnlyAppointmentsOfTheirEstablishments() {
+        var salon = TestSalon.open();
+        var staff = TestTenants.staffOf(salon.owner(), salon.openSecondEstablishment());
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(staff, id, "reschedulings", UUID.randomUUID(), Map.of("start", TestSalon.at(clock, 1, "11:00").toString()))
+                .statusCode(403).body("code", equalTo("ACCESS_DENIED"));
+        transition(staff, id, "cancellations", UUID.randomUUID(), Map.of("reason", "x")).statusCode(403);
+        transition(staff, id, "status-changes", UUID.randomUUID(), Map.of("status", "completed")).statusCode(403);
+    }
+
+    @Test
+    void staffOfTheEstablishmentChangeAnyAppointmentThere() {
+        var salon = TestSalon.open();
+        var staff = salon.hireStaff();
+        String id = book(salon.owner(), UUID.randomUUID(), body(salon, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(staff, id, "status-changes", UUID.randomUUID(), Map.of("status", "in_progress")).statusCode(200);
+        transition(staff, id, "cancellations", UUID.randomUUID(), Map.of("reason", "Se fue")).statusCode(200);
+    }
+
+    @Test
+    void appointmentOfAnotherOrganizationIsNotFound() {
+        var salon = TestSalon.open();
+        var other = TestSalon.open();
+        String id = book(other.owner(), UUID.randomUUID(), body(other, null, TestSalon.at(clock, 1, "10:00")))
+                .extract().path("id");
+
+        transition(salon.owner(), id, "reschedulings", UUID.randomUUID(), Map.of("start", TestSalon.at(clock, 1, "11:00").toString()))
+                .statusCode(404).body("code", equalTo("APPOINTMENT_NOT_FOUND"));
+        transition(salon.owner(), id, "cancellations", UUID.randomUUID(), Map.of("reason", "x")).statusCode(404);
+        transition(salon.owner(), id, "status-changes", UUID.randomUUID(), Map.of("status", "completed")).statusCode(404);
+    }
+
+    static ValidatableResponse transition(TestTenant tenant, String appointmentId, String noun, UUID key,
+                                          Map<String, Object> body) {
+        return given().spec(tenant.spec()).header("Idempotency-Key", key.toString()).contentType(ContentType.JSON)
+                .body(body).post("/api/v1/appointments/" + appointmentId + "/" + noun).then();
     }
 
     public static ValidatableResponse book(TestTenant tenant, UUID key, Map<String, Object> body) {

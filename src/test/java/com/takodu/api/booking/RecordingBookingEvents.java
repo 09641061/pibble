@@ -1,6 +1,8 @@
 package com.takodu.api.booking;
 
 import com.takodu.api.booking.interfaces.events.AppointmentBookedIntegrationEvent;
+import com.takodu.api.booking.interfaces.events.AppointmentCancelledIntegrationEvent;
+import com.takodu.api.booking.interfaces.events.AppointmentRescheduledIntegrationEvent;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Singleton;
 
@@ -17,6 +19,14 @@ public class RecordingBookingEvents {
         events.add(event);
     }
 
+    void on(@Observes AppointmentRescheduledIntegrationEvent event) {
+        events.add(event);
+    }
+
+    void on(@Observes AppointmentCancelledIntegrationEvent event) {
+        events.add(event);
+    }
+
     /** @return the events published about the appointment, oldest first */
     public List<Object> about(UUID appointmentId) {
         return events.stream().filter(event -> appointmentIdOf(event).equals(appointmentId)).toList();
@@ -25,6 +35,8 @@ public class RecordingBookingEvents {
     private static UUID appointmentIdOf(Object event) {
         return switch (event) {
             case AppointmentBookedIntegrationEvent booked -> booked.appointmentId();
+            case AppointmentRescheduledIntegrationEvent rescheduled -> rescheduled.appointmentId();
+            case AppointmentCancelledIntegrationEvent cancelled -> cancelled.appointmentId();
             default -> throw new IllegalStateException("Unknown event " + event);
         };
     }
