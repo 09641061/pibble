@@ -2,20 +2,25 @@ package com.takodu.api.organization.interfaces.rest;
 
 import com.takodu.api.organization.application.commandservices.MemberCommandService;
 import com.takodu.api.organization.application.queryservices.MemberQueryService;
+import com.takodu.api.organization.domain.model.commands.RemoveMemberCommand;
 import com.takodu.api.organization.domain.model.commands.RenewInvitationCommand;
 import com.takodu.api.organization.domain.model.queries.GetCurrentMembersQuery;
 import com.takodu.api.organization.interfaces.rest.resources.InviteMemberResource;
 import com.takodu.api.organization.interfaces.rest.resources.MemberResource;
+import com.takodu.api.organization.interfaces.rest.resources.UpdateMemberResource;
 import com.takodu.api.organization.interfaces.rest.transform.InviteMemberCommandFromResourceAssembler;
 import com.takodu.api.organization.interfaces.rest.transform.MemberResourceFromEntityAssembler;
+import com.takodu.api.organization.interfaces.rest.transform.UpdateMemberCommandFromResourceAssembler;
 import com.takodu.api.shared.application.tenancy.TenantContext;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -86,5 +91,33 @@ public class MembersController {
         var command = new RenewInvitationCommand(tenantContext.organizationId(), tenantContext.memberId(),
                 new MemberId(memberId), new IdempotencyKey(idempotencyKey));
         return MemberResourceFromEntityAssembler.toResourceFromEntity(memberCommandService.handle(command));
+    }
+
+    @PUT
+    @Path("/{memberId}")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Update member", description = "Owner or manager. Name, bookability, role and staff establishments; the owner's role cannot change (O12).")
+    @APIResponse(responseCode = "200", description = "Member updated",
+            content = @Content(schema = @Schema(implementation = MemberResource.class)))
+    @APIResponse(responseCode = "400", description = "Blank name, unknown role, or staff without establishments")
+    @APIResponse(responseCode = "403", description = "The caller is staff")
+    @APIResponse(responseCode = "404", description = "Member, or a staff establishment, not found in the organization")
+    @APIResponse(responseCode = "422", description = "OWNER_CHANGE_NOT_ALLOWED: transfer ownership instead")
+    public MemberResource update(@PathParam("memberId") UUID memberId, @Valid UpdateMemberResource resource) {
+        var command = UpdateMemberCommandFromResourceAssembler.toCommandFromResource(tenantContext.organizationId(),
+                memberId, resource);
+        return MemberResourceFromEntityAssembler.toResourceFromEntity(memberCommandService.handle(command));
+    }
+
+    @DELETE
+    @Path("/{memberId}")
+    @ResponseStatus(204)
+    @Operation(summary = "Remove member", description = "Owner or manager. Removes a member or revokes a pending invitation; history is kept.")
+    @APIResponse(responseCode = "204", description = "Member removed")
+    @APIResponse(responseCode = "403", description = "The caller is staff")
+    @APIResponse(responseCode = "404", description = "Member not found in the organization")
+    @APIResponse(responseCode = "422", description = "OWNER_CHANGE_NOT_ALLOWED, or MEMBER_HAS_UPCOMING_APPOINTMENTS")
+    public void remove(@PathParam("memberId") UUID memberId) {
+        memberCommandService.handle(new RemoveMemberCommand(tenantContext.organizationId(), new MemberId(memberId)));
     }
 }

@@ -22,6 +22,8 @@ public interface MemberRepository {
 
     Optional<Member> findCurrentById(OrganizationId organizationId, MemberId memberId);
 
+    Optional<Member> findOwner(OrganizationId organizationId);
+
     /** @return active members and pending invitations, by display name */
     List<Member> findCurrent(OrganizationId organizationId);
 
@@ -35,6 +37,8 @@ public interface MemberRepository {
     /**
      * @throws com.takodu.api.organization.domain.exceptions.MemberAlreadyExistsException when the email or the user
      *         already has a current membership in the organization (O11)
+     * @throws com.takodu.api.organization.domain.exceptions.OwnerAlreadyExistsException when another member became
+     *         owner concurrently (O3)
      * @throws com.takodu.api.shared.domain.exceptions.RequestInProgressException when a concurrent request with the
      *         same key inserted first
      */

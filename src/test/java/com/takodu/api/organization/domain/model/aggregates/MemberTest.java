@@ -4,6 +4,8 @@ import com.takodu.api.organization.domain.exceptions.InvitationAlreadyAcceptedEx
 import com.takodu.api.organization.domain.exceptions.InvitationEmailMismatchException;
 import com.takodu.api.organization.domain.exceptions.InvitationExpiredException;
 import com.takodu.api.organization.domain.exceptions.InvitationNotPendingException;
+import com.takodu.api.organization.domain.exceptions.MemberHasUpcomingAppointmentsException;
+import com.takodu.api.organization.domain.exceptions.MemberNotActiveException;
 import com.takodu.api.organization.domain.exceptions.OwnerChangeNotAllowedException;
 import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
@@ -21,6 +23,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -115,5 +118,80 @@ class MemberTest {
     private Member invite(Role role, Set<EstablishmentId> establishments) {
         return Member.invite(organization, EMAIL, "Lucía", role, establishments, true, SecretHash.of("token"), NOW,
                 new IdempotencyKey(UUID.randomUUID()));
+    }
+
+    @Test
+    void ownerKeepsTheRole() {
+        var owner = founder();
+
+        assertThrows(OwnerChangeNotAllowedException.class, () -> owner.assign(Role.MANAGER, Set.of()));
+        assertThrows(OwnerChangeNotAllowedException.class, () -> owner.remove(NOW, false));
+    }
+
+    @Test
+    void nobodyBecomesOwnerByAssignment() {
+        var member = invite(Role.STAFF, Set.of(branch));
+
+        assertThrows(OwnerChangeNotAllowedException.class, () -> member.assign(Role.OWNER, Set.of()));
+    }
+
+    @Test
+    void promotedStaffNoLongerNeedsEstablishments() {
+        var member = invite(Role.STAFF, Set.of(branch));
+
+        member.assign(Role.MANAGER, Set.of(branch));
+
+        assertEquals(Role.MANAGER, member.getRole());
+        assertTrue(member.getEstablishmentIds().isEmpty());
+    }
+
+    @Test
+    void memberWithUpcomingAppointmentsStays() {
+        var member = stored(invite(Role.STAFF, Set.of(branch)));
+
+        assertThrows(MemberHasUpcomingAppointmentsException.class, () -> member.remove(NOW, true));
+    }
+
+    @Test
+    void removedMemberIsNoLongerBookable() {
+        var member = invite(Role.STAFF, Set.of(branch));
+
+        member.remove(NOW, false);
+
+        assertNotNull(member.getRemovedAt());
+        assertFalse(member.isBookable());
+        assertFalse(member.isPending());
+    }
+
+    @Test
+    void ownershipGoesOnlyToAMemberWhoJoined() {
+        var member = stored(invite(Role.MANAGER, Set.of()));
+
+        assertThrows(MemberNotActiveException.class, member::promoteToOwner);
+    }
+
+    @Test
+    void transferSwapsTheRoles() {
+        var owner = founder();
+        var manager = invite(Role.MANAGER, Set.of());
+        manager.accept(lucia, EMAIL, NOW);
+
+        manager.promoteToOwner();
+        owner.handOverOwnership();
+
+        assertEquals(Role.OWNER, manager.getRole());
+        assertEquals(Role.MANAGER, owner.getRole());
+    }
+
+    /** The member as the repository returns it, with an id. */
+    private static Member stored(Member member) {
+        return new Member(new MemberId(UUID.randomUUID()), member.getOrganizationId(), member.getUserId(),
+                member.getEmail(), member.getDisplayName(), member.getRole(), member.isBookable(),
+                member.getInviteTokenHash(), member.getInviteExpiresAt(), member.getJoinedAt(), member.getRemovedAt(),
+                member.getEstablishmentIds(), member.getIdempotencyKey(), member.getLastIdempotencyKey());
+    }
+
+    private Member founder() {
+        return Member.founder(organization, new UserId(UUID.randomUUID()), new Email("pepe@example.com"), "Pepe", NOW);
     }
 }

@@ -73,6 +73,16 @@ public class Organization {
         if (!plan.allows(activeEstablishments)) throw new PlanLimitReachedException(plan);
     }
 
+    /** Records the key of an ownership transfer, so a retry finds it already applied (O12). */
+    public void recordTransfer(IdempotencyKey idempotencyKey) {
+        this.lastIdempotencyKey = Objects.requireNonNull(idempotencyKey, "idempotencyKey is required");
+    }
+
+    /** @return whether the transfer with this key was already applied */
+    public boolean alreadyApplied(IdempotencyKey idempotencyKey) {
+        return idempotencyKey.equals(lastIdempotencyKey);
+    }
+
     private static String requireName(String name) {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("Organization name must not be blank");
         return name.strip();

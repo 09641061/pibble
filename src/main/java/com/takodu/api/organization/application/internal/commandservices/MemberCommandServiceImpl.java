@@ -13,15 +13,21 @@ import com.takodu.api.organization.domain.model.aggregates.Establishment;
 import com.takodu.api.organization.domain.model.aggregates.Member;
 import com.takodu.api.organization.domain.model.commands.AcceptInvitationCommand;
 import com.takodu.api.organization.domain.model.commands.InviteMemberCommand;
+import com.takodu.api.organization.domain.model.commands.RemoveMemberCommand;
 import com.takodu.api.organization.domain.model.commands.RenewInvitationCommand;
+import com.takodu.api.organization.domain.model.commands.TransferOwnershipCommand;
+import com.takodu.api.organization.domain.model.commands.UpdateMemberCommand;
 import com.takodu.api.organization.domain.repositories.EstablishmentRepository;
 import com.takodu.api.organization.domain.repositories.MemberRepository;
 import com.takodu.api.organization.domain.repositories.OrganizationRepository;
+import com.takodu.api.organization.interfaces.acl.UpcomingAppointmentsProvider;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
 import com.takodu.api.shared.application.tenancy.Action;
+import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+import com.takodu.api.shared.domain.model.valueobjects.Role;
 import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,18 +49,21 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final EstablishmentRepository establishmentRepository;
     private final ExternalIamService externalIamService;
     private final InvitationSender invitationSender;
+    private final UpcomingAppointmentsProvider upcomingAppointmentsProvider;
     private final AccessPolicy accessPolicy;
     private final Clock clock;
 
     public MemberCommandServiceImpl(MemberRepository memberRepository, OrganizationRepository organizationRepository,
                                     EstablishmentRepository establishmentRepository,
                                     ExternalIamService externalIamService, InvitationSender invitationSender,
+                                    UpcomingAppointmentsProvider upcomingAppointmentsProvider,
                                     AccessPolicy accessPolicy, Clock clock) {
         this.memberRepository = memberRepository;
         this.organizationRepository = organizationRepository;
         this.establishmentRepository = establishmentRepository;
         this.externalIamService = externalIamService;
         this.invitationSender = invitationSender;
+        this.upcomingAppointmentsProvider = upcomingAppointmentsProvider;
         this.accessPolicy = accessPolicy;
         this.clock = clock;
     }
@@ -88,6 +97,60 @@ public class MemberCommandServiceImpl implements MemberCommandService {
         return invitation.member();
     }
 
+    @Override
+    @Transactional
+    public Member handle(UpdateMemberCommand command) {
+        accessPolicy.require(Action.MANAGE_MEMBERS);
+        var member = load(command.organizationId(), command.memberId());
+        if (member.getRole() != Role.OWNER || command.role() != Role.OWNER) {
+            requireActiveEstablishments(command.organizationId(), command.establishmentIds());
+            member.assign(command.role(), command.establishmentIds());
+        }
+        member.describe(command.displayName(), command.bookable());
+        return memberRepository.save(member);
+    }
+
+    @Override
+    @Transactional
+    public Member handle(RemoveMemberCommand command) {
+        accessPolicy.require(Action.MANAGE_MEMBERS);
+        var member = load(command.organizationId(), command.memberId());
+        var now = clock.instant();
+        member.remove(now, upcomingAppointmentsProvider.hasUpcomingAppointments(
+                command.organizationId().value(), command.memberId().value(), now));
+        return memberRepository.save(member);
+    }
+
+    /**
+     * The organization row stays locked until commit, so two transfers serialize. The retry check comes before the
+     * role check because a retried request comes from the former owner, who is a manager by then.
+     */
+    @Override
+    @Transactional
+    public Member handle(TransferOwnershipCommand command) {
+        var organization = organizationRepository.findByIdForUpdate(command.organizationId())
+                .orElseThrow(() -> new OrganizationNotFoundException(command.organizationId()));
+        var owner = memberRepository.findOwner(command.organizationId())
+                .orElseThrow(() -> new IllegalStateException("Organization without owner: " + command.organizationId()));
+        if (organization.alreadyApplied(command.idempotencyKey())) return owner;
+        accessPolicy.require(Action.MANAGE_ORGANIZATION);
+        if (!owner.getId().equals(command.callerId())) throw new AccessDeniedException("transfer ownership");
+        var newOwner = load(command.organizationId(), command.newOwnerId());
+        if (newOwner.getId().equals(owner.getId())) return owner;
+        newOwner.promoteToOwner();
+        owner.handOverOwnership();
+        memberRepository.save(owner);
+        var saved = memberRepository.save(newOwner);
+        organization.recordTransfer(command.idempotencyKey());
+        organizationRepository.save(organization);
+        return saved;
+    }
+
+    private Member load(OrganizationId organizationId, MemberId memberId) {
+        return memberRepository.findCurrentById(organizationId, memberId)
+                .orElseThrow(() -> new MemberNotFoundException(memberId));
+    }
+
     private Invitation invite(InviteMemberCommand command, SecretHash tokenHash) {
         accessPolicy.require(Action.MANAGE_MEMBERS);
         var earlier = memberRepository.findByIdempotencyKey(command.organizationId(), command.idempotencyKey());
@@ -103,8 +166,7 @@ public class MemberCommandServiceImpl implements MemberCommandService {
 
     private Invitation renew(RenewInvitationCommand command, SecretHash tokenHash) {
         accessPolicy.require(Action.MANAGE_MEMBERS);
-        var member = memberRepository.findCurrentById(command.organizationId(), command.memberId())
-                .orElseThrow(() -> new MemberNotFoundException(command.memberId()));
+        var member = load(command.organizationId(), command.memberId());
         if (member.alreadyApplied(command.idempotencyKey())) return new Invitation(member, false, null, null);
         member.renewInvitation(tokenHash, clock.instant(), command.idempotencyKey());
         return invitationFrom(memberRepository.save(member), command.inviterId(), true);

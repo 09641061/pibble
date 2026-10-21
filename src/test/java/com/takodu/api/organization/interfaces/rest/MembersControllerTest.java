@@ -2,6 +2,7 @@ package com.takodu.api.organization.interfaces.rest;
 
 import com.takodu.api.iam.application.internal.outboundservices.email.RecordingEmailSender;
 import com.takodu.api.iam.interfaces.rest.SignIn;
+import com.takodu.api.organization.application.internal.outboundservices.acl.FakeUpcomingAppointments;
 import com.takodu.api.organization.application.internal.outboundservices.email.RecordingInvitationSender;
 import com.takodu.api.shared.infrastructure.time.TestClock;
 import com.takodu.api.shared.testing.TestTenant;
@@ -36,6 +37,9 @@ class MembersControllerTest {
 
     @Inject
     TestClock clock;
+
+    @Inject
+    FakeUpcomingAppointments upcomingAppointments;
 
     @AfterEach
     void resetClock() {
@@ -185,6 +189,112 @@ class MembersControllerTest {
 
         renew(owner, UUID.randomUUID(), manager.memberId().toString())
                 .statusCode(422).body("code", equalTo("INVITATION_NOT_PENDING"));
+    }
+
+    @Test
+    void managerBecomesStaffOfOneEstablishment() {
+        var owner = TestTenants.owner();
+        var manager = TestTenants.managerOf(owner);
+        var establishment = TestTenants.firstEstablishmentOf(owner);
+
+        update(owner, manager.memberId(), "Lucía", false, "staff", List.of(establishment))
+                .statusCode(200)
+                .body("role", equalTo("staff"))
+                .body("bookable", equalTo(false))
+                .body("establishmentIds", hasItem(establishment.toString()));
+    }
+
+    @Test
+    void ownerEditsTheirNameButKeepsTheRole() {
+        var owner = TestTenants.owner();
+
+        update(owner, owner.memberId(), "Don Pepe", true, "owner", List.of()).statusCode(200).body("displayName", equalTo("Don Pepe"));
+        update(owner, owner.memberId(), "Don Pepe", true, "manager", List.of())
+                .statusCode(422).body("code", equalTo("OWNER_CHANGE_NOT_ALLOWED"));
+    }
+
+    @Test
+    void nobodyBecomesOwnerByUpdate() {
+        var owner = TestTenants.owner();
+        var manager = TestTenants.managerOf(owner);
+
+        update(owner, manager.memberId(), "Lucía", true, "owner", List.of())
+                .statusCode(422).body("code", equalTo("OWNER_CHANGE_NOT_ALLOWED"));
+    }
+
+    @Test
+    void removedMemberLosesAccess() {
+        var owner = TestTenants.owner();
+        var staff = TestTenants.staffOf(owner);
+
+        remove(owner, staff.memberId()).statusCode(204);
+
+        given().spec(staff.spec()).get("/api/v1/organization").then().statusCode(403);
+        given().spec(owner.spec()).get("/api/v1/members").then().body("", hasSize(1));
+    }
+
+    @Test
+    void revokedInvitationCannotBeAccepted() {
+        var owner = TestTenants.owner();
+        var email = SignIn.newEmail();
+        String memberId = invite(owner, UUID.randomUUID(), body(email, "manager", List.of())).extract().path("id");
+
+        remove(owner, UUID.fromString(memberId)).statusCode(204);
+
+        accept(signIn(email), invitationSender.lastTokenSentTo(email)).statusCode(404);
+    }
+
+    @Test
+    void removedEmailCanBeInvitedAgain() {
+        var owner = TestTenants.owner();
+        var staff = TestTenants.staffOf(owner);
+        remove(owner, staff.memberId()).statusCode(204);
+
+        invite(owner, UUID.randomUUID(), body(staff.email(), "manager", List.of())).statusCode(201);
+    }
+
+    @Test
+    void ownerIsNotRemoved() {
+        var owner = TestTenants.owner();
+
+        remove(TestTenants.managerOf(owner), owner.memberId())
+                .statusCode(422).body("code", equalTo("OWNER_CHANGE_NOT_ALLOWED"));
+    }
+
+    @Test
+    void memberWithUpcomingAppointmentsIsNotRemoved() {
+        var owner = TestTenants.owner();
+        var staff = TestTenants.staffOf(owner);
+        upcomingAppointments.book(staff.memberId());
+
+        remove(owner, staff.memberId()).statusCode(422).body("code", equalTo("MEMBER_HAS_UPCOMING_APPOINTMENTS"));
+    }
+
+    @Test
+    void staffCannotRemoveMembers() {
+        var owner = TestTenants.owner();
+        var manager = TestTenants.managerOf(owner);
+
+        remove(TestTenants.staffOf(owner), manager.memberId()).statusCode(403).body("code", equalTo("ACCESS_DENIED"));
+    }
+
+    @Test
+    void memberOfAnotherOrganizationIsNotFound() {
+        var foreign = TestTenants.managerOf(TestTenants.owner());
+
+        remove(TestTenants.owner(), foreign.memberId()).statusCode(404).body("code", equalTo("MEMBER_NOT_FOUND"));
+    }
+
+    private static ValidatableResponse update(TestTenant tenant, UUID memberId, String displayName, boolean bookable,
+                                              String role, List<UUID> establishmentIds) {
+        return given().spec(tenant.spec()).contentType(ContentType.JSON)
+                .body(Map.of("displayName", displayName, "bookable", bookable, "role", role,
+                        "establishmentIds", establishmentIds))
+                .put("/api/v1/members/" + memberId).then();
+    }
+
+    private static ValidatableResponse remove(TestTenant tenant, UUID memberId) {
+        return given().spec(tenant.spec()).delete("/api/v1/members/" + memberId).then();
     }
 
     private String signIn(String email) {

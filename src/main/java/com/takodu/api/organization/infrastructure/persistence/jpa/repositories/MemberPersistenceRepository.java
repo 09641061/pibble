@@ -2,6 +2,7 @@ package com.takodu.api.organization.infrastructure.persistence.jpa.repositories;
 
 import com.takodu.api.organization.infrastructure.persistence.jpa.entities.MemberPersistenceEntity;
 import com.takodu.api.shared.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Role;
 import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -24,6 +25,11 @@ public class MemberPersistenceRepository implements PanacheRepositoryBase<Member
 
     public Optional<MemberPersistenceEntity> findCurrentById(UUID organizationId, UUID id) {
         return find("organizationId = ?1 and id = ?2 and removedAt is null", organizationId, id).firstResultOptional();
+    }
+
+    public Optional<MemberPersistenceEntity> findOwner(UUID organizationId) {
+        return find("organizationId = ?1 and role = ?2 and removedAt is null", organizationId, Role.OWNER)
+                .firstResultOptional();
     }
 
     public List<MemberPersistenceEntity> findCurrent(UUID organizationId) {

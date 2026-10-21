@@ -5,6 +5,8 @@ import com.takodu.api.organization.domain.exceptions.InvitationEmailMismatchExce
 import com.takodu.api.organization.domain.exceptions.InvitationExpiredException;
 import com.takodu.api.organization.domain.exceptions.InvitationNotFoundException;
 import com.takodu.api.organization.domain.exceptions.InvitationNotPendingException;
+import com.takodu.api.organization.domain.exceptions.MemberHasUpcomingAppointmentsException;
+import com.takodu.api.organization.domain.exceptions.MemberNotActiveException;
 import com.takodu.api.organization.domain.exceptions.OwnerChangeNotAllowedException;
 import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
@@ -132,6 +134,54 @@ public class Member {
         this.inviteTokenHash = Objects.requireNonNull(tokenHash, "tokenHash is required");
         this.inviteExpiresAt = now.plus(INVITE_TTL);
         this.lastIdempotencyKey = idempotencyKey;
+    }
+
+    /** Changes how the team sees the member and whether they receive appointments. */
+    public void describe(String displayName, boolean bookable) {
+        this.displayName = requireDisplayName(displayName);
+        this.bookable = bookable;
+    }
+
+    /**
+     * O9, O13: changes the role and, for staff, the establishments they work at.
+     *
+     * @throws OwnerChangeNotAllowedException when the member is the owner or the new role is owner (O12)
+     */
+    public void assign(Role newRole, Set<EstablishmentId> establishmentIds) {
+        if (role == Role.OWNER || newRole == Role.OWNER) throw new OwnerChangeNotAllowedException();
+        this.establishmentIds = assignments(newRole, establishmentIds);
+        this.role = newRole;
+    }
+
+    /**
+     * Removes an active member or revokes a pending invitation. The row stays for history (soft delete).
+     *
+     * @param hasUpcomingAppointments whether booking holds appointments of this member that have not started
+     * @throws OwnerChangeNotAllowedException when the member is the owner (O12)
+     * @throws MemberHasUpcomingAppointmentsException when appointments of this member are still ahead
+     */
+    public void remove(Instant now, boolean hasUpcomingAppointments) {
+        if (role == Role.OWNER) throw new OwnerChangeNotAllowedException();
+        if (hasUpcomingAppointments) throw new MemberHasUpcomingAppointmentsException(id);
+        this.removedAt = now;
+        this.bookable = false;
+    }
+
+    /**
+     * O12: one half of an ownership transfer; {@link #handOverOwnership()} on the current owner is the other.
+     *
+     * @throws MemberNotActiveException when the member has not joined
+     */
+    public void promoteToOwner() {
+        if (!isActive()) throw new MemberNotActiveException(id);
+        this.role = Role.OWNER;
+        this.establishmentIds = Set.of();
+    }
+
+    /** O12: the former owner stays as a manager. */
+    public void handOverOwnership() {
+        if (role != Role.OWNER) throw new IllegalStateException("Only the owner hands over ownership");
+        this.role = Role.MANAGER;
     }
 
     /** @return whether a transition with this key was already applied, so a retry returns the current state */

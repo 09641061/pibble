@@ -1,6 +1,7 @@
 package com.takodu.api.organization.infrastructure.persistence.jpa.adapters;
 
 import com.takodu.api.organization.domain.exceptions.MemberAlreadyExistsException;
+import com.takodu.api.organization.domain.exceptions.OwnerAlreadyExistsException;
 import com.takodu.api.organization.domain.model.aggregates.Member;
 import com.takodu.api.organization.domain.repositories.MemberRepository;
 import com.takodu.api.organization.infrastructure.persistence.jpa.assemblers.MemberPersistenceAssembler;
@@ -22,6 +23,7 @@ import java.util.Optional;
 public class MemberRepositoryImpl implements MemberRepository {
     private static final String ACTIVE_EMAIL_UNIQUE = "members_active_email_uk";
     private static final String ACTIVE_USER_UNIQUE = "members_active_user_uk";
+    private static final String ONE_OWNER_UNIQUE = "members_one_owner_uk";
     private static final String IDEMPOTENCY_UNIQUE = "members_idempotency_uk";
 
     private final MemberPersistenceRepository memberPersistenceRepository;
@@ -46,6 +48,12 @@ public class MemberRepositoryImpl implements MemberRepository {
     @Override
     public Optional<Member> findCurrentById(OrganizationId organizationId, MemberId memberId) {
         return memberPersistenceRepository.findCurrentById(organizationId.value(), memberId.value())
+                .map(MemberPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<Member> findOwner(OrganizationId organizationId) {
+        return memberPersistenceRepository.findOwner(organizationId.value())
                 .map(MemberPersistenceAssembler::toDomainFromPersistence);
     }
 
@@ -86,6 +94,7 @@ public class MemberRepositoryImpl implements MemberRepository {
         } catch (ConstraintViolationException e) {
             switch (e.getConstraintName()) {
                 case ACTIVE_EMAIL_UNIQUE, ACTIVE_USER_UNIQUE -> throw new MemberAlreadyExistsException(member.getEmail());
+                case ONE_OWNER_UNIQUE -> throw new OwnerAlreadyExistsException();
                 case IDEMPOTENCY_UNIQUE -> throw new RequestInProgressException();
                 case null, default -> throw e;
             }
