@@ -13,6 +13,9 @@ public interface CustomerRepository {
     /** @return the customer unless deleted */
     Optional<Customer> findActiveById(OrganizationId organizationId, CustomerId customerId);
 
+    /** @return the customer, deleted or not */
+    Optional<Customer> findById(OrganizationId organizationId, CustomerId customerId);
+
     Optional<Customer> findActiveByPhone(OrganizationId organizationId, PhoneNumber phone);
 
     /**
@@ -31,4 +34,12 @@ public interface CustomerRepository {
      *         same key inserted first
      */
     Customer save(Customer customer);
+
+    /**
+     * C1, C2: inserts the customer unless an active customer already has its phone, without failing when a
+     * concurrent transaction inserts the same phone first.
+     *
+     * @return the inserted customer, or the active customer that has the phone
+     */
+    Customer addIfPhoneFree(Customer customer);
 }

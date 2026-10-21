@@ -4,6 +4,7 @@ import com.takodu.api.customers.domain.exceptions.CustomerAlreadyRegisteredExcep
 import com.takodu.api.customers.domain.exceptions.CustomerNotFoundException;
 import com.takodu.api.customers.domain.model.aggregates.Customer;
 import com.takodu.api.customers.domain.model.commands.DeleteCustomerCommand;
+import com.takodu.api.customers.domain.model.commands.RecordWhatsappContactCommand;
 import com.takodu.api.customers.domain.model.commands.RegisterCustomerCommand;
 import com.takodu.api.customers.domain.model.commands.UpdateCustomerCommand;
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
@@ -25,4 +26,12 @@ public interface CustomerCommandService {
      * @throws CustomerNotFoundException when the customer is deleted or not in the organization
      */
     void handle(DeleteCustomerCommand command);
+
+    /**
+     * C2: needs no {@code TenantContext}. Safe to repeat and to run concurrently for one number: every call returns
+     * the same active customer.
+     *
+     * @return the active customer with the phone, its WhatsApp profile name refreshed
+     */
+    Customer handle(RecordWhatsappContactCommand command);
 }

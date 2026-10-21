@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -59,6 +60,16 @@ class CustomerTest {
 
         assertEquals("Rosa 🌸", customer.displayName());
         assertEquals("45678912", customer.getDocument().number());
+    }
+
+    @Test
+    void longProfileNameIsCutNotRefused() {
+        var customer = Customer.fromWhatsapp(organization, phone, "🌸".repeat(200));
+
+        assertEquals(120, customer.getWhatsappProfileName().codePointCount(0, customer.getWhatsappProfileName().length()));
+        assertFalse(customer.refreshProfileName(null));
+        assertTrue(customer.refreshProfileName("Rosa"));
+        assertFalse(customer.refreshProfileName(" Rosa "));
     }
 
     private Customer customer(String name, String whatsappProfileName) {

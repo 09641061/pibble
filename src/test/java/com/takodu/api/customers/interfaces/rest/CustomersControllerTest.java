@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 @QuarkusTest
-class CustomersControllerTest {
+public class CustomersControllerTest {
 
     @Inject
     TestClock clock;
@@ -232,32 +232,32 @@ class CustomersControllerTest {
         search(TestTenants.staffOf(TestTenants.owner()), Map.of("q", "987")).body("items", hasSize(0));
     }
 
-    static Map<String, Object> body(String phone) {
+    public static Map<String, Object> body(String phone) {
         var body = new HashMap<String, Object>();
         body.put("phone", phone);
         return body;
     }
 
-    static ValidatableResponse register(TestTenant tenant, UUID key, Map<String, Object> body) {
+    public static ValidatableResponse register(TestTenant tenant, UUID key, Map<String, Object> body) {
         return given().spec(tenant.spec()).header("Idempotency-Key", key.toString())
                 .contentType(ContentType.JSON).body(body)
                 .post("/api/v1/customers").then();
     }
 
-    static ValidatableResponse search(TestTenant tenant, Map<String, ?> params) {
+    public static ValidatableResponse search(TestTenant tenant, Map<String, ?> params) {
         return given().spec(tenant.spec()).queryParams(params).get("/api/v1/customers").then();
     }
 
-    static ValidatableResponse update(TestTenant tenant, String id, Map<String, Object> body) {
+    public static ValidatableResponse update(TestTenant tenant, String id, Map<String, Object> body) {
         return given().spec(tenant.spec()).contentType(ContentType.JSON).body(body)
                 .put("/api/v1/customers/" + id).then();
     }
 
-    static ValidatableResponse delete(TestTenant tenant, String id) {
+    public static ValidatableResponse delete(TestTenant tenant, String id) {
         return given().spec(tenant.spec()).delete("/api/v1/customers/" + id).then();
     }
 
-    static String registered(TestTenant tenant, String phone) {
+    public static String registered(TestTenant tenant, String phone) {
         return register(tenant, UUID.randomUUID(), body(phone)).statusCode(201).extract().path("id");
     }
 }

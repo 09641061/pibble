@@ -36,6 +36,13 @@ public class Customer {
                 Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"));
     }
 
+    /** C2: the first inbound WhatsApp message from an unknown number. */
+    public static Customer fromWhatsapp(OrganizationId organizationId, PhoneNumber phone, String profileName) {
+        var customer = new Customer(null, organizationId, phone, null, null, null, null, null, null);
+        customer.refreshProfileName(profileName);
+        return customer;
+    }
+
     /** Rehydration constructor; only persistence assemblers call it. */
     public Customer(CustomerId id, OrganizationId organizationId, PhoneNumber phone, String name,
                     String whatsappProfileName, IdentityDocument document, String notes, Instant deletedAt,
@@ -49,6 +56,21 @@ public class Customer {
         this.notes = requireNotes(notes);
         this.deletedAt = deletedAt;
         this.idempotencyKey = idempotencyKey;
+    }
+
+    /**
+     * Keeps the latest WhatsApp profile name; a blank one keeps the previous. Meta's text is cut to 120 characters
+     * instead of refused, because the customer chose it.
+     *
+     * @return whether the name changed
+     */
+    public boolean refreshProfileName(String profileName) {
+        if (profileName == null || profileName.isBlank()) return false;
+        var cut = profileName.strip().codePoints().limit(MAX_NAME)
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString().strip();
+        if (cut.equals(whatsappProfileName)) return false;
+        this.whatsappProfileName = cut;
+        return true;
     }
 
     /** C4: replaces what staff typed; the phone never changes (C1). */

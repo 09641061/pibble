@@ -5,6 +5,7 @@ import com.takodu.api.customers.domain.exceptions.CustomerAlreadyRegisteredExcep
 import com.takodu.api.customers.domain.exceptions.CustomerNotFoundException;
 import com.takodu.api.customers.domain.model.aggregates.Customer;
 import com.takodu.api.customers.domain.model.commands.DeleteCustomerCommand;
+import com.takodu.api.customers.domain.model.commands.RecordWhatsappContactCommand;
 import com.takodu.api.customers.domain.model.commands.RegisterCustomerCommand;
 import com.takodu.api.customers.domain.model.commands.UpdateCustomerCommand;
 import com.takodu.api.customers.domain.repositories.CustomerRepository;
@@ -57,6 +58,17 @@ public class CustomerCommandServiceImpl implements CustomerCommandService {
         var customer = load(command.organizationId(), command.customerId());
         customer.delete(clock.instant());
         customerRepository.save(customer);
+    }
+
+    @Override
+    @Transactional
+    public Customer handle(RecordWhatsappContactCommand command) {
+        var existing = customerRepository.findActiveByPhone(command.organizationId(), command.phone());
+        if (existing.isEmpty())
+            return customerRepository.addIfPhoneFree(Customer.fromWhatsapp(command.organizationId(), command.phone(),
+                    command.profileName()));
+        var customer = existing.get();
+        return customer.refreshProfileName(command.profileName()) ? customerRepository.save(customer) : customer;
     }
 
     private Customer load(OrganizationId organizationId, CustomerId customerId) {

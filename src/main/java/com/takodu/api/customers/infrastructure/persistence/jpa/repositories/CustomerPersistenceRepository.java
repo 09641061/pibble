@@ -24,6 +24,22 @@ public class CustomerPersistenceRepository implements PanacheRepositoryBase<Cust
         return find("organizationId = ?1 and id = ?2 and deletedAt is null", organizationId, id).firstResultOptional();
     }
 
+    public Optional<CustomerPersistenceEntity> findById(UUID organizationId, UUID id) {
+        return find("organizationId = ?1 and id = ?2", organizationId, id).firstResultOptional();
+    }
+
+    /** Waits for a concurrent insert of the same phone, then does nothing; {@code customers_phone_uk} is the arbiter. */
+    public void insertIfPhoneFree(UUID organizationId, String phoneE164, String whatsappProfileName) {
+        getEntityManager().createNativeQuery("""
+                        INSERT INTO customers (organization_id, phone_e164, whatsapp_profile_name)
+                        VALUES (:organizationId, :phone, :profileName)
+                        ON CONFLICT (organization_id, phone_e164) WHERE deleted_at IS NULL DO NOTHING""")
+                .setParameter("organizationId", organizationId)
+                .setParameter("phone", phoneE164)
+                .setParameter("profileName", whatsappProfileName)
+                .executeUpdate();
+    }
+
     public Optional<CustomerPersistenceEntity> findActiveByPhone(UUID organizationId, String phoneE164) {
         return find("organizationId = ?1 and phoneE164 = ?2 and deletedAt is null", organizationId, phoneE164)
                 .firstResultOptional();

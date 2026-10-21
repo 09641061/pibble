@@ -34,6 +34,12 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     }
 
     @Override
+    public Optional<Customer> findById(OrganizationId organizationId, CustomerId customerId) {
+        return customerPersistenceRepository.findById(organizationId.value(), customerId.value())
+                .map(CustomerPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
     public Optional<Customer> findActiveByPhone(OrganizationId organizationId, PhoneNumber phone) {
         return customerPersistenceRepository.findActiveByPhone(organizationId.value(), phone.e164())
                 .map(CustomerPersistenceAssembler::toDomainFromPersistence);
@@ -70,5 +76,13 @@ public class CustomerRepositoryImpl implements CustomerRepository {
             }
         }
         return CustomerPersistenceAssembler.toDomainFromPersistence(entity);
+    }
+
+    @Override
+    public Customer addIfPhoneFree(Customer customer) {
+        if (customer.getId() != null) throw new IllegalArgumentException("Customer is already stored");
+        customerPersistenceRepository.insertIfPhoneFree(customer.getOrganizationId().value(), customer.getPhone().e164(),
+                customer.getWhatsappProfileName());
+        return findActiveByPhone(customer.getOrganizationId(), customer.getPhone()).orElseThrow();
     }
 }
