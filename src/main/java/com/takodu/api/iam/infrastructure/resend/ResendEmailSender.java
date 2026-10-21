@@ -1,8 +1,9 @@
 package com.takodu.api.iam.infrastructure.resend;
 
 import com.takodu.api.iam.application.internal.outboundservices.email.EmailSender;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.iam.domain.model.valueobjects.LoginCodeId;
+import com.takodu.api.shared.infrastructure.resend.ResendClient;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;

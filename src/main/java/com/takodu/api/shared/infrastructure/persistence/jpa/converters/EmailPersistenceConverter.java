@@ -1,6 +1,6 @@
-package com.takodu.api.iam.infrastructure.persistence.jpa.converters;
+package com.takodu.api.shared.infrastructure.persistence.jpa.converters;
 
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 

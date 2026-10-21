@@ -2,7 +2,7 @@ package com.takodu.api.iam.infrastructure.persistence.jpa.repositories;
 
 import com.takodu.api.iam.infrastructure.persistence.jpa.entities.SessionPersistenceEntity;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
-import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
+import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.LockModeType;
 

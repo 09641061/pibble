@@ -5,8 +5,8 @@ import com.takodu.api.iam.application.internal.outboundservices.email.EmailSende
 import com.takodu.api.iam.domain.exceptions.LoginCodeLimitReachedException;
 import com.takodu.api.iam.domain.model.aggregates.LoginCode;
 import com.takodu.api.iam.domain.model.commands.RequestLoginCodeCommand;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
-import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import com.takodu.api.iam.domain.repositories.LoginCodeRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;

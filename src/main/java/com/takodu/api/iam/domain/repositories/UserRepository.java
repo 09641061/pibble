@@ -1,7 +1,7 @@
 package com.takodu.api.iam.domain.repositories;
 
 import com.takodu.api.iam.domain.model.aggregates.User;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.shared.domain.model.valueobjects.UserId;
 
 import java.util.Optional;

@@ -1,6 +1,6 @@
 package com.takodu.api.iam.domain.model.commands;
 
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 
 /**
  * Email a new sign-in code to this address.

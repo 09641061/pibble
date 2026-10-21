@@ -1,7 +1,7 @@
 package com.takodu.api.iam.domain.repositories;
 
 import com.takodu.api.iam.domain.model.aggregates.LoginCode;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 
 import java.time.Instant;
 import java.util.List;

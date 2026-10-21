@@ -1,8 +1,8 @@
 package com.takodu.api.iam.domain.model.aggregates;
 
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.iam.domain.model.valueobjects.LoginCodeId;
-import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
+import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import lombok.Getter;
 
 import java.time.Duration;

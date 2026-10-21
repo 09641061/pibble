@@ -18,7 +18,7 @@ Each bounded context is a direct subpackage of `com.takodu.api`. `shared` is the
 
 `ArchitectureTest.ALLOWED_DEPENDENCIES` mirrors the "May depend on" column, and a class in a package missing from it fails the build. Change the table, the map and, for a new context, a decision record in the same commit.
 
-The shared kernel holds the typed identifiers used by several contexts (`OrganizationId`, `EstablishmentId`, `MemberId`, `CustomerId`, `UserId`, `ServiceId`), `Money`, `TimeRange`, `IdempotencyKey`, the tenancy holder `TenantContext` with `AccessPolicy`, the domain exceptions, `GlobalExceptionMapper`, `ErrorResource`, `AuditableAbstractPersistenceEntity` and the UTC `Clock` producer.
+The shared kernel holds the typed identifiers used by several contexts (`OrganizationId`, `EstablishmentId`, `MemberId`, `CustomerId`, `UserId`, `ServiceId`), `Money`, `TimeRange`, `IdempotencyKey`, `Email`, `SecretHash`, the tenancy holder `TenantContext` with `AccessPolicy`, the domain exceptions, `GlobalExceptionMapper`, `ErrorResource`, `AuditableAbstractPersistenceEntity`, the Resend REST client and the UTC `Clock` producer.
 
 ## Layers inside a context
 

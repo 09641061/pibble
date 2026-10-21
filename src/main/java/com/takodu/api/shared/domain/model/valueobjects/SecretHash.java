@@ -1,4 +1,4 @@
-package com.takodu.api.iam.domain.model.valueobjects;
+package com.takodu.api.shared.domain.model.valueobjects;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -6,7 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * SHA-256 of a secret the caller holds (a sign-in code or a refresh token). Only the hash is stored, so a
+ * SHA-256 of a secret the caller holds (a sign-in code, a refresh token or an invitation token). Only the hash is stored, so a
  * database leak does not reveal usable secrets.
  *
  * @param value lower-case hex digest

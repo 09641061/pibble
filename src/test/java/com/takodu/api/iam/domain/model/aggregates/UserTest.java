@@ -1,7 +1,7 @@
 package com.takodu.api.iam.domain.model.aggregates;
 
 import com.takodu.api.iam.domain.exceptions.UserDisabledException;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.shared.domain.model.valueobjects.UserId;
 import org.junit.jupiter.api.Test;
 

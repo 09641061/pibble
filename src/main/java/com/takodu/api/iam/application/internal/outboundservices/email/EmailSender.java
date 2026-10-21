@@ -1,6 +1,6 @@
 package com.takodu.api.iam.application.internal.outboundservices.email;
 
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.iam.domain.model.valueobjects.LoginCodeId;
 
 /** Sends transactional email. Implementations never log the code. */

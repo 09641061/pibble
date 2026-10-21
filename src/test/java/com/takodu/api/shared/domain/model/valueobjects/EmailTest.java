@@ -1,4 +1,4 @@
-package com.takodu.api.iam.domain.model.valueobjects;
+package com.takodu.api.shared.domain.model.valueobjects;
 
 import org.junit.jupiter.api.Test;
 

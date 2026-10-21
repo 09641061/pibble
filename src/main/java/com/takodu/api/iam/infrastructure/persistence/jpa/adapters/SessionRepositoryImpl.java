@@ -1,7 +1,7 @@
 package com.takodu.api.iam.infrastructure.persistence.jpa.adapters;
 
 import com.takodu.api.iam.domain.model.aggregates.Session;
-import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
+import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
 import com.takodu.api.iam.domain.model.valueobjects.SessionId;
 import com.takodu.api.iam.domain.repositories.SessionRepository;
 import com.takodu.api.iam.infrastructure.persistence.jpa.assemblers.SessionPersistenceAssembler;

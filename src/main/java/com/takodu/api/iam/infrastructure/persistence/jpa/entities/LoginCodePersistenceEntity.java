@@ -1,9 +1,9 @@
 package com.takodu.api.iam.infrastructure.persistence.jpa.entities;
 
-import com.takodu.api.iam.domain.model.valueobjects.Email;
-import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
-import com.takodu.api.iam.infrastructure.persistence.jpa.converters.EmailPersistenceConverter;
-import com.takodu.api.iam.infrastructure.persistence.jpa.converters.SecretHashPersistenceConverter;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.SecretHash;
+import com.takodu.api.shared.infrastructure.persistence.jpa.converters.EmailPersistenceConverter;
+import com.takodu.api.shared.infrastructure.persistence.jpa.converters.SecretHashPersistenceConverter;
 import com.takodu.api.shared.infrastructure.persistence.jpa.entities.AuditableAbstractPersistenceEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;

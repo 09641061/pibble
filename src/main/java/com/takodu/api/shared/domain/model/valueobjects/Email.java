@@ -1,9 +1,10 @@
-package com.takodu.api.iam.domain.model.valueobjects;
+package com.takodu.api.shared.domain.model.valueobjects;
 
 import java.util.Locale;
 
 /**
- * I1: a user's email, trimmed and lower-cased so {@code Ana@Gmail.com } and {@code ana@gmail.com} are one user.
+ * An email address, trimmed and lower-cased so {@code Ana@Gmail.com } and {@code ana@gmail.com} are one address
+ * (I1). Users sign in with it and members are invited to it (O10).
  *
  * @param value the normalized address
  */

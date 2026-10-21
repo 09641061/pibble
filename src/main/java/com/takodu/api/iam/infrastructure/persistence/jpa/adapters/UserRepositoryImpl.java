@@ -1,7 +1,7 @@
 package com.takodu.api.iam.infrastructure.persistence.jpa.adapters;
 
 import com.takodu.api.iam.domain.model.aggregates.User;
-import com.takodu.api.iam.domain.model.valueobjects.Email;
+import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.iam.domain.repositories.UserRepository;
 import com.takodu.api.iam.infrastructure.persistence.jpa.assemblers.UserPersistenceAssembler;
 import com.takodu.api.iam.infrastructure.persistence.jpa.repositories.UserPersistenceRepository;
