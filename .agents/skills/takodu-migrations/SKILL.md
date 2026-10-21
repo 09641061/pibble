@@ -42,18 +42,18 @@ Flyway runs the migrations at startup in every profile (`quarkus.flyway.migrate-
 | W4 one message per `wamid` | unique `wamid` | none: the webhook treats it as a duplicate and skips |
 | One assistant turn per message | unique `trigger_message_id` | none: the handler skips |
 
-The domain checks the same rule first to give a precise error; the constraint is the guarantee under concurrency. Find-or-create without a caller to retry (a webhook, a job) inserts with `ON CONFLICT (…) WHERE … DO NOTHING` and then reads the winner, because a caught violation aborts the caller's transaction (`CustomerRepositoryImpl.addIfPhoneFree`). The adapter flushes inside `save` so the violation surfaces there, not at commit:
+The domain checks the rule first for a precise error; the constraint guarantees it under concurrency. Find-or-create without a caller to retry (a webhook, a job) inserts with `ON CONFLICT (…) WHERE … DO NOTHING` and then reads the winner, because a caught violation aborts the caller's transaction (`CustomerRepositoryImpl.addIfPhoneFree`). The adapter flushes inside `save` so the violation surfaces there, not at commit:
 
 ```java
 } catch (ConstraintViolationException e) {           // org.hibernate.exception
-    switch (e.getConstraintName()) {
+    switch (constraintOf(e)) {
         case "appointments_staff_no_overlap", "appointments_customer_no_overlap" -> throw new SlotUnavailableException("taken");
         case null, default -> throw e;
     }
 }
 ```
 
-Match on the constraint name, not only the SQL state (`23P01` exclusion, `23505` unique), so two constraints on one table map to different errors. An unmapped violation stays a 500 on purpose: it means a rule was missed.
+Match on the constraint name, not only the SQL state (`23P01` exclusion, `23505` unique), so two constraints on one table map to different errors. Hibernate omits exclusion constraint names; `AppointmentRepositoryImpl.constraintOf` reads them from the driver. An unmapped violation stays a 500 on purpose: it means a rule was missed.
 
 ## Entities must match the migration
 
