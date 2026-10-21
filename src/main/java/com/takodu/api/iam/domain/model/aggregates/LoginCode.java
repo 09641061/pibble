@@ -47,4 +47,35 @@ public class LoginCode {
         this.expiresAt = Objects.requireNonNull(expiresAt, "expiresAt is required");
         this.consumedAt = consumedAt;
     }
+
+    /**
+     * @param now the current instant
+     * @return whether the code can still be tried: unused, unexpired and under {@link #MAX_ATTEMPTS} (I2)
+     */
+    public boolean isUsable(Instant now) {
+        return consumedAt == null && now.isBefore(expiresAt) && attempts < MAX_ATTEMPTS;
+    }
+
+    /**
+     * @param candidate hash of the code the caller typed
+     * @return whether it is this code
+     */
+    public boolean matches(SecretHash candidate) {
+        return codeHash.matches(candidate);
+    }
+
+    /** I2: a wrong code counts against every code the email could still use. */
+    public void recordFailedAttempt() {
+        if (attempts < MAX_ATTEMPTS) attempts++;
+    }
+
+    /**
+     * Uses the code up. A successful sign-in consumes every usable code of the email, so an older code that
+     * arrives late cannot be used afterwards.
+     *
+     * @param now the current instant
+     */
+    public void consume(Instant now) {
+        if (consumedAt == null) consumedAt = now;
+    }
 }

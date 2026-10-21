@@ -7,7 +7,6 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
@@ -20,11 +19,11 @@ class LoginCodesControllerTest {
     @Inject
     RecordingEmailSender emailSender;
 
-    static String newEmail() {
-        return "user-" + UUID.randomUUID() + "@example.com";
+    private static String newEmail() {
+        return SignIn.newEmail();
     }
 
-    static void requestCode(String email, int expectedStatus) {
+    private static void requestCode(String email, int expectedStatus) {
         given().contentType(ContentType.JSON).body(Map.of("email", email))
                 .when().post("/api/v1/auth/login-codes")
                 .then().statusCode(expectedStatus);

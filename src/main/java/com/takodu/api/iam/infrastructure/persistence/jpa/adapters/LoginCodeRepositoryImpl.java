@@ -8,6 +8,7 @@ import com.takodu.api.iam.infrastructure.persistence.jpa.repositories.LoginCodeP
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Instant;
+import java.util.List;
 
 @ApplicationScoped
 public class LoginCodeRepositoryImpl implements LoginCodeRepository {
@@ -21,6 +22,13 @@ public class LoginCodeRepositoryImpl implements LoginCodeRepository {
     @Override
     public long countIssuedSince(Email email, Instant since) {
         return loginCodePersistenceRepository.countExpiringAfter(email, since.plus(LoginCode.TTL));
+    }
+
+    @Override
+    public List<LoginCode> findUsableForUpdate(Email email, Instant now) {
+        return loginCodePersistenceRepository.findUsableForUpdate(email, now, LoginCode.MAX_ATTEMPTS).stream()
+                .map(LoginCodePersistenceAssembler::toDomainFromPersistence)
+                .toList();
     }
 
     @Override
