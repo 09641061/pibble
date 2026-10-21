@@ -43,8 +43,8 @@ class ArchitectureTest {
     /** Context map: each context and the contexts it may call (facade) or listen to (events). Calls go down. */
     static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
             "shared", Set.of(),
-            "identity", Set.of(),
-            "organization", Set.of("identity"),
+            "iam", Set.of(),
+            "organization", Set.of("iam"),
             "customers", Set.of(),
             "booking", Set.of("organization", "customers"),
             "conversations", Set.of("organization", "customers", "booking"),

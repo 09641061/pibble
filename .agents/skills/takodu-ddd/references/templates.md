@@ -249,10 +249,10 @@ public class CustomerQueryServiceImpl implements CustomerQueryService {
 }
 ```
 
-An outbound port to an external system; its implementation lives in `identity.infrastructure.resend.ResendEmailSender`.
+An outbound port to an external system; its implementation lives in `iam.infrastructure.resend.ResendEmailSender`.
 
 ```java
-package com.takodu.api.identity.application.internal.outboundservices.email;
+package com.takodu.api.iam.application.internal.outboundservices.email;
 
 public interface EmailSender {
     void sendLoginCode(Email to, String code);

@@ -46,7 +46,7 @@ Build from the inside out: domain first, HTTP last. Each step names the files it
 
 1. Run `./mvnw test`. `ArchitectureTest` must pass; fix the placement instead of weakening a rule.
 2. Update the docs the change affects in the same commit ([takodu-docs](../takodu-docs/SKILL.md)). Write a decision record only when you chose between real alternatives.
-3. Commit with `feat(<context>): <imperative summary>`, where the context is `identity`, `organization`, `customers`, `booking`, `conversations` or `assistant`; split unrelated changes into separate commits.
+3. Commit with `feat(<context>): <imperative summary>`, where the context is `iam`, `organization`, `customers`, `booking`, `conversations` or `assistant`; split unrelated changes into separate commits.
 
 ## Done means
 

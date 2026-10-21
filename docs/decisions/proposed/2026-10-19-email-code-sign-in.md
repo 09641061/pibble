@@ -8,7 +8,7 @@ Staff sign in from a phone and a computer. Passwords need reset flows and leak; 
 
 ## Proposal
 
-Sign-in is passwordless: `identity` emails a 6-digit code through Resend, valid 10 minutes, single use, with 5 wrong attempts and at most 5 codes per email per hour. The first successful sign-in creates the `User`. A `Session` is a refresh token (30 days, rotated on every use, stored only as a hash) plus 15-minute JWT access tokens verified with SmallRye JWT. A user may hold several sessions, each revocable. Codes and sessions are PostgreSQL rows; a daily job deletes expired ones.
+Sign-in is passwordless: `iam` emails a 6-digit code through Resend, valid 10 minutes, single use, with 5 wrong attempts and at most 5 codes per email per hour. The first successful sign-in creates the `User`. A `Session` is a refresh token (30 days, rotated on every use, stored only as a hash) plus 15-minute JWT access tokens verified with SmallRye JWT. A user may hold several sessions, each revocable. Codes and sessions are PostgreSQL rows; a daily job deletes expired ones.
 
 ## Alternatives considered
 

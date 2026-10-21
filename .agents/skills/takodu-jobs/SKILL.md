@@ -15,7 +15,7 @@ Slow or failing work never runs inside a request or webhook transaction. The tra
 | `OutboundMessageSender` | `conversations` | `messages` (`pending`, outbound) | after-commit wake-up + every 10 s | Send staff and assistant messages to Meta |
 | `MediaDownloader` | `conversations` | `messages` with `media_id` and no `media_path` | after-commit wake-up + every 60 s | Download inbound media to the media volume |
 | `TurnWorker` | `assistant` | `assistant_turns` (`pending`) | after-commit wake-up + every 10 s | Run the assistant, at most 4 turns in parallel |
-| `CleanupJob` | `identity` | expired `login_codes`, `sessions` | daily | Delete them |
+| `CleanupJob` | `iam` | expired `login_codes`, `sessions` | daily | Delete them |
 
 Jobs live in `<context>.application.internal.jobs`, use `quarkus-scheduler` (`@Scheduled(every = "30s", concurrentExecution = SKIP)`), and call ports for external systems, never infrastructure classes.
 

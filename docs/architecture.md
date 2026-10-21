@@ -9,8 +9,8 @@ Each bounded context is a direct subpackage of `com.takodu.api`. `shared` is the
 | Context | Type | Aggregates | May depend on | Publishes (events) |
 |---|---|---|---|---|
 | `shared` | kernel | — | — | — |
-| `identity` | generic | `User`, `LoginCode`, `Session` | — | — |
-| `organization` | supporting | `Organization`, `Establishment`, `Member`, `Service` | `identity` | — |
+| `iam` | generic | `User`, `LoginCode`, `Session` | — | — |
+| `organization` | supporting | `Organization`, `Establishment`, `Member`, `Service` | `iam` | — |
 | `customers` | supporting | `Customer` | — | — |
 | `booking` | core | `Appointment`, `TimeBlock` | `organization`, `customers` | `AppointmentBooked`, `AppointmentRescheduled`, `AppointmentCancelled` |
 | `conversations` | core | `WhatsappLine`, `Conversation`, `Message`, `ScheduledMessage` | `organization`, `customers`, `booking` (events only) | `InboundMessageReceived` |
