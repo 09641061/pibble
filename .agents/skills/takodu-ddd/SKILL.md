@@ -83,6 +83,8 @@ The arrows point inward: `interfaces → application → domain ← infrastructu
 | `BusinessRuleViolationException` | 422 | invariant or state transition refused |
 | `AccessDeniedException` | 403 | role or establishment does not allow the action |
 | `PlanInactiveException` | 402 | organization plan inactive (O6) |
+| `AuthenticationFailedException` | 401 | sign-in code or refresh token wrong, used or expired |
+| `TooManyRequestsException` | 429 | rate limit of a business rule (I3) |
 | `IllegalArgumentException` | 400 | value object or command argument invalid |
 
 Never throw `jakarta.ws.rs.*Exception`, return `null` for a business failure, or rethrow a vaguer exception. A database constraint that guards an invariant (exclusion, partial unique index) is translated by the repository adapter into the context's exception, by SQL state.

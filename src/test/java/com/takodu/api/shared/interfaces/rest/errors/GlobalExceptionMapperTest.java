@@ -1,11 +1,13 @@
 package com.takodu.api.shared.interfaces.rest.errors;
 
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
+import com.takodu.api.shared.domain.exceptions.AuthenticationFailedException;
 import com.takodu.api.shared.domain.exceptions.BusinessRuleViolationException;
 import com.takodu.api.shared.domain.exceptions.ConflictException;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
 import com.takodu.api.shared.domain.exceptions.RequestInProgressException;
 import com.takodu.api.shared.domain.exceptions.ResourceNotFoundException;
+import com.takodu.api.shared.domain.exceptions.TooManyRequestsException;
 import com.takodu.api.shared.interfaces.rest.resources.ErrorResource;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +54,19 @@ class GlobalExceptionMapperTest {
     @Test
     void inactivePlanMapsTo402() {
         assertEquals(402, mapper.toResponse(new PlanInactiveException("org-1")).getStatus());
+    }
+
+    @Test
+    void failedAuthenticationMapsTo401WithItsCode() {
+        var response = mapper.toResponse(new AuthenticationFailedException("LOGIN_CODE_INVALID", "Code is invalid"));
+
+        assertEquals(401, response.getStatus());
+        assertEquals(new ErrorResource("LOGIN_CODE_INVALID", "Code is invalid"), response.getEntity());
+    }
+
+    @Test
+    void rateLimitMapsTo429() {
+        assertEquals(429, mapper.toResponse(new TooManyRequestsException("LOGIN_CODE_LIMIT", "Too many")).getStatus());
     }
 
     @Test
