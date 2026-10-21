@@ -20,6 +20,7 @@ import com.takodu.api.organization.domain.model.commands.UpdateMemberCommand;
 import com.takodu.api.organization.domain.repositories.EstablishmentRepository;
 import com.takodu.api.organization.domain.repositories.MemberRepository;
 import com.takodu.api.organization.domain.repositories.OrganizationRepository;
+import com.takodu.api.organization.domain.repositories.ServiceRepository;
 import com.takodu.api.organization.interfaces.acl.UpcomingAppointmentsProvider;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
 import com.takodu.api.shared.application.tenancy.Action;
@@ -47,6 +48,7 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final MemberRepository memberRepository;
     private final OrganizationRepository organizationRepository;
     private final EstablishmentRepository establishmentRepository;
+    private final ServiceRepository serviceRepository;
     private final ExternalIamService externalIamService;
     private final InvitationSender invitationSender;
     private final UpcomingAppointmentsProvider upcomingAppointmentsProvider;
@@ -54,13 +56,14 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private final Clock clock;
 
     public MemberCommandServiceImpl(MemberRepository memberRepository, OrganizationRepository organizationRepository,
-                                    EstablishmentRepository establishmentRepository,
+                                    EstablishmentRepository establishmentRepository, ServiceRepository serviceRepository,
                                     ExternalIamService externalIamService, InvitationSender invitationSender,
                                     UpcomingAppointmentsProvider upcomingAppointmentsProvider,
                                     AccessPolicy accessPolicy, Clock clock) {
         this.memberRepository = memberRepository;
         this.organizationRepository = organizationRepository;
         this.establishmentRepository = establishmentRepository;
+        this.serviceRepository = serviceRepository;
         this.externalIamService = externalIamService;
         this.invitationSender = invitationSender;
         this.upcomingAppointmentsProvider = upcomingAppointmentsProvider;
@@ -107,6 +110,7 @@ public class MemberCommandServiceImpl implements MemberCommandService {
             member.assign(command.role(), command.establishmentIds());
         }
         member.describe(command.displayName(), command.bookable());
+        dropFromServicesTheyCannotPerform(member);
         return memberRepository.save(member);
     }
 
@@ -118,6 +122,7 @@ public class MemberCommandServiceImpl implements MemberCommandService {
         var now = clock.instant();
         member.remove(now, upcomingAppointmentsProvider.hasUpcomingAppointments(
                 command.organizationId().value(), command.memberId().value(), now));
+        dropFromServicesTheyCannotPerform(member);
         return memberRepository.save(member);
     }
 
@@ -144,6 +149,12 @@ public class MemberCommandServiceImpl implements MemberCommandService {
         organization.recordTransfer(command.idempotencyKey());
         organizationRepository.save(organization);
         return saved;
+    }
+
+    /** O15 keeps holding after the member changed: removed, not bookable, or moved to other establishments. */
+    private void dropFromServicesTheyCannotPerform(Member member) {
+        for (var service : serviceRepository.findByPerformer(member.getOrganizationId(), member.getId()))
+            if (service.dropIfIneligible(member)) serviceRepository.save(service);
     }
 
     private Member load(OrganizationId organizationId, MemberId memberId) {

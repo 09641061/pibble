@@ -96,6 +96,11 @@ public class Member {
         return userId != null && removedAt == null;
     }
 
+    /** O15: whether the member may perform services of the establishment. */
+    public boolean canPerformAt(EstablishmentId establishmentId) {
+        return isActive() && bookable && (role.seesAllEstablishments() || establishmentIds.contains(establishmentId));
+    }
+
     /** @return whether the invitation was neither accepted nor revoked */
     public boolean isPending() {
         return userId == null && removedAt == null;
