@@ -1,5 +1,7 @@
 package com.takodu.api.customers.interfaces.acl;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,4 +20,10 @@ public interface CustomersContextFacade {
 
     /** @return the customer even when deleted, empty when not in the organization */
     Optional<CustomerView> fetchCustomer(UUID organizationId, UUID customerId);
+
+    /**
+     * @param customerIds at most 200, such as the senders of one inbox page
+     * @return the customers found, deleted or not, in no particular order; ids of other organizations are skipped
+     */
+    List<CustomerView> fetchCustomers(UUID organizationId, Collection<UUID> customerIds);
 }

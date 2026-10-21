@@ -13,6 +13,7 @@ import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.hibernate.exception.ConstraintViolationException;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,6 +38,14 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     public Optional<Customer> findById(OrganizationId organizationId, CustomerId customerId) {
         return customerPersistenceRepository.findById(organizationId.value(), customerId.value())
                 .map(CustomerPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<Customer> findByIds(OrganizationId organizationId, Collection<CustomerId> customerIds) {
+        return customerPersistenceRepository.findByIds(organizationId.value(),
+                        customerIds.stream().map(CustomerId::value).toList()).stream()
+                .map(CustomerPersistenceAssembler::toDomainFromPersistence)
+                .toList();
     }
 
     @Override

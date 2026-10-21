@@ -5,6 +5,7 @@ import com.takodu.api.customers.application.queryservices.CustomerQueryService;
 import com.takodu.api.customers.domain.model.aggregates.Customer;
 import com.takodu.api.customers.domain.model.commands.RecordWhatsappContactCommand;
 import com.takodu.api.customers.domain.model.queries.GetCustomerIncludingDeletedQuery;
+import com.takodu.api.customers.domain.model.queries.GetCustomersIncludingDeletedQuery;
 import com.takodu.api.customers.domain.model.valueobjects.PhoneNumber;
 import com.takodu.api.customers.interfaces.acl.CustomerView;
 import com.takodu.api.customers.interfaces.acl.CustomersContextFacade;
@@ -12,8 +13,12 @@ import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import static java.util.stream.Collectors.toSet;
 
 @ApplicationScoped
 public class CustomersContextFacadeImpl implements CustomersContextFacade {
@@ -36,6 +41,14 @@ public class CustomersContextFacadeImpl implements CustomersContextFacade {
     public Optional<CustomerView> fetchCustomer(UUID organizationId, UUID customerId) {
         return customerQueryService.handle(new GetCustomerIncludingDeletedQuery(new OrganizationId(organizationId),
                 new CustomerId(customerId))).map(CustomersContextFacadeImpl::view);
+    }
+
+    @Override
+    public List<CustomerView> fetchCustomers(UUID organizationId, Collection<UUID> customerIds) {
+        return customerQueryService.handle(new GetCustomersIncludingDeletedQuery(new OrganizationId(organizationId),
+                        customerIds.stream().map(CustomerId::new).collect(toSet()))).stream()
+                .map(CustomersContextFacadeImpl::view)
+                .toList();
     }
 
     private static CustomerView view(Customer customer) {

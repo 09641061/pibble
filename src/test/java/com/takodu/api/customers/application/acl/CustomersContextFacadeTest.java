@@ -8,9 +8,12 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static io.restassured.RestAssured.given;
@@ -102,5 +105,19 @@ class CustomersContextFacadeTest {
         customersContextFacade.findOrCreateByWhatsapp(owner.organizationId(), "51987654321", "Rosa 🌸");
 
         CustomersControllerTest.search(owner, Map.of("q", "rosa")).body("items[0].phone", equalTo("+51987654321"));
+    }
+
+    @Test
+    void severalCustomersAtOnceIncludeDeletedOnesAndSkipOtherOrganizations() {
+        var owner = TestTenants.owner();
+        var rosa = customersContextFacade.findOrCreateByWhatsapp(owner.organizationId(), "51987654321", "Rosa");
+        var luis = customersContextFacade.findOrCreateByWhatsapp(owner.organizationId(), "51912345678", "Luis");
+        CustomersControllerTest.delete(owner, luis.id().toString()).statusCode(204);
+        var stranger = customersContextFacade.findOrCreateByWhatsapp(TestTenants.owner().organizationId(), "51955555555", null);
+
+        var found = customersContextFacade.fetchCustomers(owner.organizationId(), List.of(rosa.id(), luis.id(), stranger.id()));
+
+        assertEquals(Set.of(rosa.id(), luis.id()), found.stream().map(CustomerView::id).collect(Collectors.toSet()));
+        assertTrue(customersContextFacade.fetchCustomers(owner.organizationId(), List.of()).isEmpty());
     }
 }
