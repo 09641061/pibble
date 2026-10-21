@@ -6,12 +6,14 @@ import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundExcept
 import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.commands.AssignConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
+import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
 import com.takodu.api.shared.application.tenancy.Action;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.transaction.Transactional;
 
 @ApplicationScoped
@@ -19,13 +21,15 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
     private final ConversationRepository conversationRepository;
     private final ExternalOrganizationService externalOrganizationService;
     private final AccessPolicy accessPolicy;
+    private final Event<ConversationChangedEvent> conversationChanged;
 
     public ConversationCommandServiceImpl(ConversationRepository conversationRepository,
                                           ExternalOrganizationService externalOrganizationService,
-                                          AccessPolicy accessPolicy) {
+                                          AccessPolicy accessPolicy, Event<ConversationChangedEvent> conversationChanged) {
         this.conversationRepository = conversationRepository;
         this.externalOrganizationService = externalOrganizationService;
         this.accessPolicy = accessPolicy;
+        this.conversationChanged = conversationChanged;
     }
 
     @Override
@@ -33,7 +37,7 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
     public Conversation handle(MarkConversationReadCommand command) {
         var conversation = lock(command.organizationId(), command.conversationId());
         conversation.markRead();
-        return conversationRepository.save(conversation);
+        return save(conversation);
     }
 
     @Override
@@ -44,7 +48,15 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
             externalOrganizationService.requireMemberWorksAt(command.organizationId(), command.memberId(),
                     conversation.getEstablishmentId());
         conversation.assignTo(command.memberId());
-        return conversationRepository.save(conversation);
+        return save(conversation);
+    }
+
+    /** Other members' inboxes follow the change (W8, W9). */
+    private Conversation save(Conversation conversation) {
+        var saved = conversationRepository.save(conversation);
+        conversationChanged.fire(new ConversationChangedEvent(saved.getOrganizationId(), saved.getEstablishmentId(),
+                saved.getId()));
+        return saved;
     }
 
     /** Checks the caller before loading, then their establishment once the conversation names it (W7). */

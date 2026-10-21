@@ -13,6 +13,7 @@ import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.model.commands.SendNextPendingMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.SendStaffMessageCommand;
+import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.events.OutboundMessageQueuedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
@@ -38,6 +39,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     private final WhatsappGateway whatsappGateway;
     private final AccessPolicy accessPolicy;
     private final Event<OutboundMessageQueuedEvent> outboundMessageQueued;
+    private final Event<ConversationChangedEvent> conversationChanged;
     private final Clock clock;
 
     public MessageCommandServiceImpl(MessageRepository messageRepository, ConversationRepository conversationRepository,
@@ -45,7 +47,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
                                      ExternalOrganizationService externalOrganizationService,
                                      ExternalCustomersService externalCustomersService, WhatsappGateway whatsappGateway,
                                      AccessPolicy accessPolicy, Event<OutboundMessageQueuedEvent> outboundMessageQueued,
-                                     Clock clock) {
+                                     Event<ConversationChangedEvent> conversationChanged, Clock clock) {
         this.messageRepository = messageRepository;
         this.conversationRepository = conversationRepository;
         this.whatsappLineRepository = whatsappLineRepository;
@@ -54,6 +56,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         this.whatsappGateway = whatsappGateway;
         this.accessPolicy = accessPolicy;
         this.outboundMessageQueued = outboundMessageQueued;
+        this.conversationChanged = conversationChanged;
         this.clock = clock;
     }
 
@@ -78,6 +81,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         conversation.recordHumanOutbound(now);
         conversationRepository.save(conversation);
         outboundMessageQueued.fire(new OutboundMessageQueuedEvent(message.getId()));
+        conversationChanged.fire(changed(conversation));
         return message;
     }
 
@@ -92,7 +96,13 @@ public class MessageCommandServiceImpl implements MessageCommandService {
                 .orElseThrow();
         send(message, conversation, command);
         messageRepository.save(message);
+        conversationChanged.fire(changed(conversation));
         return true;
+    }
+
+    private static ConversationChangedEvent changed(Conversation conversation) {
+        return new ConversationChangedEvent(conversation.getOrganizationId(), conversation.getEstablishmentId(),
+                conversation.getId());
     }
 
     /** Re-checks O6, W15 and W6 before calling Meta: they may have changed since the message was queued. */

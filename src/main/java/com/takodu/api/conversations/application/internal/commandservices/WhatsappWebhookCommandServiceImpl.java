@@ -15,6 +15,8 @@ import com.takodu.api.conversations.domain.model.commands.RecordDeliveryStatusCo
 import com.takodu.api.conversations.domain.model.commands.RecordHistoryMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.RecordInboundMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.VerifyWhatsappWebhookCommand;
+import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
+import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.conversations.domain.repositories.MessageRepository;
 import com.takodu.api.conversations.domain.repositories.WhatsappLineRepository;
@@ -25,6 +27,7 @@ import jakarta.enterprise.event.Event;
 import jakarta.transaction.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -36,19 +39,22 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
     private final MessageRepository messageRepository;
     private final ExternalCustomersService externalCustomersService;
     private final Event<InboundMessageReceivedIntegrationEvent> inboundMessageReceived;
+    private final Event<ConversationChangedEvent> conversationChanged;
 
     public WhatsappWebhookCommandServiceImpl(WhatsappWebhookReader whatsappWebhookReader,
                                              WhatsappLineRepository whatsappLineRepository,
                                              ConversationRepository conversationRepository,
                                              MessageRepository messageRepository,
                                              ExternalCustomersService externalCustomersService,
-                                             Event<InboundMessageReceivedIntegrationEvent> inboundMessageReceived) {
+                                             Event<InboundMessageReceivedIntegrationEvent> inboundMessageReceived,
+                                             Event<ConversationChangedEvent> conversationChanged) {
         this.whatsappWebhookReader = whatsappWebhookReader;
         this.whatsappLineRepository = whatsappLineRepository;
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.externalCustomersService = externalCustomersService;
         this.inboundMessageReceived = inboundMessageReceived;
+        this.conversationChanged = conversationChanged;
     }
 
     @Override
@@ -56,15 +62,19 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
     public void handle(ReceiveWhatsappWebhookCommand command) {
         if (!whatsappWebhookReader.isAuthentic(command.body(), command.signature()))
             throw new InvalidWebhookSignatureException();
+        var changed = new LinkedHashMap<ConversationId, ConversationChangedEvent>();
         for (var fact : whatsappWebhookReader.read(command.body())) {
-            switch (fact) {
+            var conversation = switch (fact) {
                 case RecordInboundMessageCommand inbound -> record(inbound);
                 case RecordBusinessAppEchoCommand echo -> record(echo);
                 case RecordHistoryMessageCommand history -> record(history);
                 case RecordDeliveryStatusCommand status -> record(status);
                 case DisconnectAccountLinesCommand disconnect -> record(disconnect);
-            }
+            };
+            conversation.ifPresent(found -> changed.putIfAbsent(found.getId(), new ConversationChangedEvent(
+                    found.getOrganizationId(), found.getEstablishmentId(), found.getId())));
         }
+        changed.values().forEach(conversationChanged::fire);
     }
 
     @Override
@@ -75,13 +85,13 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
     }
 
     /** W3, W4, W6: the customer wrote; published to the assistant only the first time the wamid arrives. */
-    private void record(RecordInboundMessageCommand command) {
+    private Optional<Conversation> record(RecordInboundMessageCommand command) {
         var line = connectedLine(command.phoneNumberId());
-        if (line.isEmpty()) return;
+        if (line.isEmpty()) return Optional.empty();
         var customerId = externalCustomersService.findOrCreateByWhatsapp(line.get().getOrganizationId(),
                 command.customerWaId(), command.profileName());
         var conversation = conversationRepository.lockOrStart(line.get(), customerId, command.occurredAt());
-        if (messageRepository.existsByWamid(command.wamid())) return;
+        if (messageRepository.existsByWamid(command.wamid())) return Optional.empty();
         var message = messageRepository.save(Message.inbound(conversation, command.wamid(), command.content(),
                 command.occurredAt()));
         conversation.recordInbound(command.occurredAt());
@@ -90,42 +100,45 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
                 message.getId().value(), conversation.getId().value(), conversation.getEstablishmentId().value(),
                 conversation.getCustomerId().value(), command.content().kind().name().toLowerCase(Locale.ROOT),
                 command.occurredAt()));
+        return Optional.of(conversation);
     }
 
     /** W5, A3: the owner answered from the phone, so the chat shows it and the assistant steps back. */
-    private void record(RecordBusinessAppEchoCommand command) {
+    private Optional<Conversation> record(RecordBusinessAppEchoCommand command) {
         var conversation = conversationOf(command.phoneNumberId(), command.customerWaId(), command.occurredAt());
-        if (conversation.isEmpty() || messageRepository.existsByWamid(command.wamid())) return;
+        if (conversation.isEmpty() || messageRepository.existsByWamid(command.wamid())) return Optional.empty();
         messageRepository.save(Message.businessAppEcho(conversation.get(), command.wamid(), command.content(),
                 command.occurredAt()));
         conversation.get().recordHumanOutbound(command.occurredAt());
-        conversationRepository.save(conversation.get());
+        return Optional.of(conversationRepository.save(conversation.get()));
     }
 
     /** History fills the chat but opens no window, counts as read and wakes no assistant. */
-    private void record(RecordHistoryMessageCommand command) {
+    private Optional<Conversation> record(RecordHistoryMessageCommand command) {
         var conversation = conversationOf(command.phoneNumberId(), command.customerWaId(), command.occurredAt());
-        if (conversation.isEmpty() || messageRepository.existsByWamid(command.wamid())) return;
+        if (conversation.isEmpty() || messageRepository.existsByWamid(command.wamid())) return Optional.empty();
         messageRepository.save(Message.history(conversation.get(), command.wamid(), command.content(),
                 command.fromCustomer(), command.status(), command.occurredAt()));
         conversation.get().recordHistory(command.occurredAt());
-        conversationRepository.save(conversation.get());
+        return Optional.of(conversationRepository.save(conversation.get()));
     }
 
     /** W10: statuses for messages Takodu does not know, such as ones sent before the line connected, are ignored. */
-    private void record(RecordDeliveryStatusCommand command) {
-        messageRepository.lockByWamid(command.wamid()).ifPresent(message -> {
-            message.applyStatus(command.status(), command.pricingCategory(), command.billable(), command.error());
-            messageRepository.save(message);
-        });
+    private Optional<Conversation> record(RecordDeliveryStatusCommand command) {
+        var message = messageRepository.lockByWamid(command.wamid());
+        if (message.isEmpty()) return Optional.empty();
+        message.get().applyStatus(command.status(), command.pricingCategory(), command.billable(), command.error());
+        messageRepository.save(message.get());
+        return conversationRepository.findById(message.get().getOrganizationId(), message.get().getConversationId());
     }
 
-    private void record(DisconnectAccountLinesCommand command) {
+    private Optional<Conversation> record(DisconnectAccountLinesCommand command) {
         for (var line : whatsappLineRepository.findConnectedByWabaId(command.wabaId())) {
             line.disconnect();
             whatsappLineRepository.save(line);
             Log.infof("WhatsApp line %s disconnected by Meta", line.getId().value());
         }
+        return Optional.empty();
     }
 
     private Optional<Conversation> conversationOf(String phoneNumberId, String customerWaId, Instant firstMessageAt) {
