@@ -77,6 +77,12 @@ class CurrentOrganizationControllerTest {
     }
 
     @Test
+    void managerCannotRenameTheOrganization() {
+        rename(TestTenants.managerOf(TestTenants.owner()).spec(), "Mine")
+                .statusCode(403).body("code", equalTo("ACCESS_DENIED"));
+    }
+
+    @Test
     void renamingNeedsAnActivePlan() {
         var owner = TestTenants.owner();
         clock.advance(Duration.ofDays(15));

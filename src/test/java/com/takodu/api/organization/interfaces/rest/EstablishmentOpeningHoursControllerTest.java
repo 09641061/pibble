@@ -66,6 +66,16 @@ class EstablishmentOpeningHoursControllerTest {
     }
 
     @Test
+    void managerSetsHoursButStaffCannot() {
+        var owner = TestTenants.owner();
+        var establishment = TestTenants.firstEstablishmentOf(owner);
+
+        replace(TestTenants.managerOf(owner), establishment, List.of(range(2, "10:00", "19:00"))).statusCode(200);
+        replace(TestTenants.staffOf(owner), establishment, List.of())
+                .statusCode(403).body("code", equalTo("ACCESS_DENIED"));
+    }
+
+    @Test
     void overlappingRangesAreRefused() {
         var owner = TestTenants.owner();
 

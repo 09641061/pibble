@@ -64,6 +64,9 @@ public class MemberPersistenceEntity extends AuditableAbstractPersistenceEntity 
     @Column(name = "idempotency_key", updatable = false)
     private UUID idempotencyKey;
 
+    @Column(name = "last_idempotency_key")
+    private UUID lastIdempotencyKey;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "member_establishments", joinColumns = @JoinColumn(name = "member_id"))
     @Column(name = "establishment_id")

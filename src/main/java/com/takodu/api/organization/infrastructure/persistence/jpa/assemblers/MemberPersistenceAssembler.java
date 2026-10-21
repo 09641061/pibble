@@ -22,7 +22,7 @@ public final class MemberPersistenceAssembler {
                 entity.getDisplayName(), entity.getRole(), entity.isBookable(), entity.getInviteTokenHash(),
                 entity.getInviteExpiresAt(), entity.getJoinedAt(), entity.getRemovedAt(),
                 entity.getEstablishmentIds().stream().map(EstablishmentId::new).collect(Collectors.toSet()),
-                key(entity.getIdempotencyKey()));
+                key(entity.getIdempotencyKey()), key(entity.getLastIdempotencyKey()));
     }
 
     public static MemberPersistenceEntity toPersistenceFromDomain(Member member) {
@@ -41,6 +41,7 @@ public final class MemberPersistenceAssembler {
         entity.setEstablishmentIds(member.getEstablishmentIds().stream().map(EstablishmentId::value)
                 .collect(Collectors.toCollection(HashSet::new)));
         entity.setIdempotencyKey(value(member.getIdempotencyKey()));
+        entity.setLastIdempotencyKey(value(member.getLastIdempotencyKey()));
         return entity;
     }
 }

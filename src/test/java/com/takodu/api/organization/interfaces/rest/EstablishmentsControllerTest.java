@@ -119,6 +119,39 @@ class EstablishmentsControllerTest {
     }
 
     @Test
+    void maxPlanOpensMoreEstablishments() {
+        var owner = TestTenants.owner();
+        TestTenants.upgradeToMax(owner);
+
+        open(owner, UUID.randomUUID(), "Sede Surco").statusCode(201);
+        open(owner, UUID.randomUUID(), "Sede Barranco").statusCode(201);
+        given().spec(owner.spec()).get("/api/v1/establishments").then().body("", hasSize(3));
+    }
+
+    @Test
+    void staffSeeOnlyTheirEstablishments() {
+        var owner = TestTenants.owner();
+        TestTenants.upgradeToMax(owner);
+        var main = TestTenants.firstEstablishmentOf(owner);
+        String other = open(owner, UUID.randomUUID(), "Sede Surco").statusCode(201).extract().path("id");
+        var staff = TestTenants.staffOf(owner, UUID.fromString(other));
+
+        given().spec(staff.spec()).get("/api/v1/establishments")
+                .then().statusCode(200).body("", hasSize(1)).body("[0].id", equalTo(other));
+        given().spec(staff.spec()).get("/api/v1/establishments/" + main)
+                .then().statusCode(403).body("code", equalTo("ACCESS_DENIED"));
+    }
+
+    @Test
+    void managerCannotOpenEstablishments() {
+        var owner = TestTenants.owner();
+        TestTenants.upgradeToMax(owner);
+
+        open(TestTenants.managerOf(owner), UUID.randomUUID(), "Sede Surco")
+                .statusCode(403).body("code", equalTo("ACCESS_DENIED"));
+    }
+
+    @Test
     void establishmentOfAnotherOrganizationIsNotFound() {
         var other = TestTenants.firstEstablishmentOf(TestTenants.owner());
 
