@@ -20,6 +20,7 @@ import lombok.Getter;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Objects;
 import java.util.Set;
 
@@ -30,6 +31,14 @@ import java.util.Set;
 @Getter
 public class Member {
     public static final Duration INVITE_TTL = Duration.ofDays(7);
+
+    /**
+     * The team's order, which breaks ties when no member was chosen for an appointment: members in the order they
+     * joined, pending invitations last.
+     */
+    public static final Comparator<Member> TEAM_ORDER = Comparator
+            .comparing(Member::getJoinedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(member -> member.getId().value());
 
     private final MemberId id;
     private final OrganizationId organizationId;
@@ -96,9 +105,14 @@ public class Member {
         return userId != null && removedAt == null;
     }
 
+    /** O13: whether the member has joined and works at the establishment; owners and managers work at all. */
+    public boolean worksAt(EstablishmentId establishmentId) {
+        return isActive() && (role.seesAllEstablishments() || establishmentIds.contains(establishmentId));
+    }
+
     /** O15: whether the member may perform services of the establishment. */
     public boolean canPerformAt(EstablishmentId establishmentId) {
-        return isActive() && bookable && (role.seesAllEstablishments() || establishmentIds.contains(establishmentId));
+        return bookable && worksAt(establishmentId);
     }
 
     /** @return whether the invitation was neither accepted nor revoked */

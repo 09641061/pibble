@@ -18,8 +18,10 @@ import com.takodu.api.shared.domain.model.valueobjects.UserId;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -181,6 +183,30 @@ class MemberTest {
 
         assertEquals(Role.OWNER, manager.getRole());
         assertEquals(Role.MANAGER, owner.getRole());
+    }
+
+    @Test
+    void staffWorkOnlyWhereAssignedAndOnlyOnceJoined() {
+        var member = invite(Role.STAFF, Set.of(branch));
+        assertFalse(member.worksAt(branch));
+
+        member.accept(lucia, EMAIL, NOW);
+
+        assertTrue(member.worksAt(branch));
+        assertFalse(member.worksAt(new EstablishmentId(UUID.randomUUID())));
+        assertTrue(founder().worksAt(new EstablishmentId(UUID.randomUUID())));
+    }
+
+    @Test
+    void teamOrderIsTheOrderMembersJoinedWithInvitationsLast() {
+        var later = stored(invite(Role.STAFF, Set.of(branch)));
+        later.accept(lucia, EMAIL, NOW.plusSeconds(60));
+        var earlier = stored(founder());
+        var pending = stored(invite(Role.MANAGER, Set.of()));
+
+        var ordered = Stream.of(pending, later, earlier).sorted(Member.TEAM_ORDER).toList();
+
+        assertEquals(List.of(earlier, later, pending), ordered);
     }
 
     /** The member as the repository returns it, with an id. */

@@ -3,6 +3,7 @@ package com.takodu.api.organization.application.internal.queryservices;
 import com.takodu.api.organization.application.queryservices.EstablishmentQueryService;
 import com.takodu.api.organization.domain.model.aggregates.Establishment;
 import com.takodu.api.organization.domain.model.queries.GetActiveEstablishmentsQuery;
+import com.takodu.api.organization.domain.model.queries.GetEstablishmentCalendarQuery;
 import com.takodu.api.organization.domain.model.queries.GetEstablishmentByIdQuery;
 import com.takodu.api.organization.domain.repositories.EstablishmentRepository;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
@@ -37,5 +38,10 @@ public class EstablishmentQueryServiceImpl implements EstablishmentQueryService 
         var establishment = establishmentRepository.findById(query.organizationId(), query.establishmentId());
         establishment.ifPresent(found -> accessPolicy.requireEstablishment(found.getId()));
         return establishment;
+    }
+
+    @Override
+    public Optional<Establishment> handle(GetEstablishmentCalendarQuery query) {
+        return establishmentRepository.findById(query.organizationId(), query.establishmentId());
     }
 }

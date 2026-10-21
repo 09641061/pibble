@@ -1,6 +1,7 @@
 package com.takodu.api.organization.application.queryservices;
 
 import com.takodu.api.organization.domain.model.aggregates.Service;
+import com.takodu.api.organization.domain.model.queries.GetBookableServiceQuery;
 import com.takodu.api.organization.domain.model.queries.GetServiceByIdQuery;
 import com.takodu.api.organization.domain.model.queries.GetServicesByEstablishmentQuery;
 
@@ -22,4 +23,7 @@ public interface ServiceQueryService {
      *         the service's establishment (O13)
      */
     Optional<Service> handle(GetServiceByIdQuery query);
+
+    /** @return the service, active or not, with its eligible performers; empty when not in the organization */
+    Optional<BookableService> handle(GetBookableServiceQuery query);
 }
