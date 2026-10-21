@@ -5,7 +5,7 @@ description: How a request in the pibble backend learns who is calling and in wh
 
 # Tenancy and access in pibble
 
-Every row belongs to one organization, and a caller may act only inside the organizations they are a member of. The decision is [tenancy and fixed roles](../../../docs/decisions/proposed/2026-10-19-tenancy-and-fixed-roles.md); the role table is in `../docs/03-business-domain.md` §5. Package names are relative to `com.takodu.api`.
+Every row belongs to one organization, and a caller may act only inside the organizations they are a member of. The decision is [tenancy and fixed roles](../../../docs/decisions/implemented/2026-10-19-tenancy-and-fixed-roles.md); the role table is in `../docs/03-business-domain.md` §5. Package names are relative to `com.takodu.api`.
 
 ## The pieces and where they live
 

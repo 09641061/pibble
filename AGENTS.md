@@ -40,7 +40,7 @@ Before pushing, run the evidence that matches the change: tests of the touched d
 - **Contexts meet only through `interfaces.acl` (facades) and `interfaces.events` (integration events)**, and only along the context map in [docs/architecture.md](docs/architecture.md). Never import another context's domain, application or persistence.
 - **Expected failures are typed domain exceptions** extending a base in `shared.domain.exceptions`; `GlobalExceptionMapper` is the only place that chooses the HTTP status ([decision](docs/decisions/implemented/2026-10-19-errors-with-exception-mapper.md)).
 - **Aggregates have no setters.** Every state change is a method with a business name that checks its invariant.
-- **Tenant, role and owner never come from a request body.** They come from `TenantContext`, and every repository query is scoped by `OrganizationId` ([decision](docs/decisions/proposed/2026-10-19-tenancy-and-fixed-roles.md)).
+- **Tenant, role and owner never come from a request body.** They come from `TenantContext`, and every repository query is scoped by `OrganizationId` ([decision](docs/decisions/implemented/2026-10-19-tenancy-and-fixed-roles.md)).
 - **Identifiers are UUIDs** wrapped in typed value objects (`CustomerId`); money is integer cents plus currency; instants are UTC `Instant`.
 - **Documentation travels with the code** in the same commit. A decision with real alternatives is recorded in `docs/decisions/`.
 - **Commits:** a Conventional Commits subject with the context as scope (`feat(booking): …`), no body or one short line, no attribution trailers; `scripts/check-commit-msg.sh` enforces it. Reasons and evidence go in the pull request's Proof block.
