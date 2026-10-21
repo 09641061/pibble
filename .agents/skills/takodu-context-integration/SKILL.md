@@ -16,7 +16,7 @@ Choose the facade when the caller needs the answer to continue. Choose an event 
 
 ## The context map
 
-A context may depend only on the contexts in its "May depend on" column in [docs/architecture.md](../../../docs/architecture.md), mirrored by `ArchitectureTest.ALLOWED_DEPENDENCIES`. Calls go down (`assistant → booking → organization → identity`); when a lower context must trigger work in a higher one, it publishes an event that the higher one observes. `booking` never calls `conversations`: `conversations` listens to `AppointmentBookedIntegrationEvent`. Adding an edge to the map is a design change: update the table, the map and a decision record in the same commit, and never add an edge that creates a cycle.
+A context may depend only on the contexts in its "May depend on" column in [docs/architecture.md](../../../docs/architecture.md), mirrored by `ArchitectureTest.ALLOWED_DEPENDENCIES`. Calls go down (`assistant → booking → organization → iam`); when a lower context must trigger work in a higher one, it publishes an event that the higher one observes. `booking` never calls `conversations`: `conversations` listens to `AppointmentBookedIntegrationEvent`. Adding an edge to the map is a design change: update the table, the map and a decision record in the same commit, and never add an edge that creates a cycle.
 
 ## ACL facade (supplier side)
 

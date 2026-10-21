@@ -14,7 +14,7 @@ Flyway runs the migrations at startup in every profile (`quarkus.flyway.migrate-
 ## Files
 
 - Location: `src/main/resources/db/migration`.
-- The version is the UTC creation time, `V<yyyyMMddHHmm>__<description>.sql`, so parallel branches never collide. A context's first file creates all its tables (`V202610211430__identity.sql`); every later change is a new file (`V202611031015__booking_add_no_show_reason.sql`). Build contexts in dependency order (identity first, assistant last).
+- The version is the UTC creation time, `V<yyyyMMddHHmm>__<description>.sql`, so parallel branches never collide. A context's first file creates all its tables (`V202610211430__iam.sql`); every later change is a new file (`V202611031015__booking_add_no_show_reason.sql`). Build contexts in dependency order (iam first, assistant last).
 - If `main` gained a newer migration meanwhile, rename yours to a new timestamp before merging; Flyway refuses a version older than an applied one.
 - **Never edit or rename a migration after it is on `main`**; Flyway's checksum fails on every database that ran it.
 - Copy the context's tables from `../docs/schema.sql`, then apply the conventions below where it differs.

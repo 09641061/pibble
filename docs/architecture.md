@@ -9,8 +9,8 @@ Each bounded context is a direct subpackage of `com.takodu.api`. `shared` is the
 | Context | Type | Aggregates | May depend on | Publishes (events) |
 |---|---|---|---|---|
 | `shared` | kernel | — | — | — |
-| `identity` | generic | `User`, `LoginCode`, `Session` | — | — |
-| `organization` | supporting | `Organization`, `Establishment`, `Member`, `Service` | `identity` | — |
+| `iam` | generic | `User`, `LoginCode`, `Session` | — | — |
+| `organization` | supporting | `Organization`, `Establishment`, `Member`, `Service` | `iam` | — |
 | `customers` | supporting | `Customer` | — | — |
 | `booking` | core | `Appointment`, `TimeBlock` | `organization`, `customers` | `AppointmentBooked`, `AppointmentRescheduled`, `AppointmentCancelled` |
 | `conversations` | core | `WhatsappLine`, `Conversation`, `Message`, `ScheduledMessage` | `organization`, `customers`, `booking` (events only) | `InboundMessageReceived` |
@@ -60,11 +60,13 @@ Each table belongs to one context; foreign keys across contexts are allowed, but
 | Exception | Status |
 |---|---|
 | `IllegalArgumentException` (invalid value object or command) | 400 |
+| `AuthenticationFailedException` (wrong sign-in code or refresh token) | 401 |
 | `PlanInactiveException` | 402 |
 | `AccessDeniedException` | 403 |
 | `ResourceNotFoundException` | 404 |
 | `ConflictException` | 409 |
 | `BusinessRuleViolationException` | 422 |
+| `TooManyRequestsException` | 429 |
 | Anything else | 500 (Quarkus logs it) |
 
 The body is `{"code": "...", "message": "..."}`. Bean Validation rejections (`@Valid` on a resource) are also 400, but Quarkus returns them in its own violations format. The reason is in the [errors decision](decisions/implemented/2026-10-19-errors-with-exception-mapper.md).

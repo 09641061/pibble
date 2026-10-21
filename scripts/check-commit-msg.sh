@@ -6,7 +6,7 @@ set -uo pipefail
 msg=$(grep -v '^#' "$1")
 subject=$(head -n1 <<< "$msg")
 types='feat|fix|refactor|test|docs|build|ci|chore|perf'
-scopes='identity|organization|customers|booking|conversations|assistant|shared|arch'
+scopes='iam|organization|customers|booking|conversations|assistant|shared|arch'
 fail=0
 err() { echo "commit-msg: $*" >&2; fail=1; }
 

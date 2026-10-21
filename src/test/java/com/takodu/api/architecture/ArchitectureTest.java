@@ -43,8 +43,8 @@ class ArchitectureTest {
     /** Context map: each context and the contexts it may call (facade) or listen to (events). Calls go down. */
     static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
             "shared", Set.of(),
-            "identity", Set.of(),
-            "organization", Set.of("identity"),
+            "iam", Set.of(),
+            "organization", Set.of("iam"),
             "customers", Set.of(),
             "booking", Set.of("organization", "customers"),
             "conversations", Set.of("organization", "customers", "booking"),
@@ -115,6 +115,7 @@ class ArchitectureTest {
             .that().areDeclaredInClassesThat().resideInAPackage("..domain.repositories..")
             .and().areDeclaredInClassesThat().areInterfaces()
             .and().areDeclaredInClassesThat().areNotAnnotations()
+            .and().areDeclaredInClassesThat().resideOutsideOfPackage(BASE + ".iam..")
             .should(beScopedByOrganization())
             .because("an id from another organization must find nothing (takodu-tenancy)");
 
@@ -217,7 +218,8 @@ class ArchitectureTest {
     }
 
     /**
-     * A repository method takes an {@code OrganizationId}, an {@code EstablishmentId} or an aggregate (which
+     * {@code iam} is exempt: users exist above organizations, and its lookups are scoped by the user or by the
+     * secret the caller presents. A repository method takes an {@code OrganizationId}, an {@code EstablishmentId} or an aggregate (which
      * carries its organization), or is marked {@code @CrossTenant} for a job or webhook.
      */
     private static ArchCondition<JavaMethod> beScopedByOrganization() {

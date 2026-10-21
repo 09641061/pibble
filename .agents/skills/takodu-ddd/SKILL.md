@@ -5,7 +5,7 @@ description: The DDD and layering standard for the pibble Quarkus backend. Use b
 
 # Pibble DDD standard
 
-Pibble is a modular monolith. Each bounded context (`identity`, `organization`, `customers`, `booking`, `conversations`, `assistant`) is a direct subpackage of `com.takodu.api` with the same four layers; [docs/architecture.md](../../../docs/architecture.md) lists what each owns and which contexts it may depend on. `ArchitectureTest` enforces the dependency and naming rules marked **[enforced]**; review enforces the rest. When this skill and the code disagree, the code is wrong unless a decision record in `docs/decisions/implemented/` says otherwise. Business rules come from the product docs (`../docs/03-business-domain.md`); cite their id (`B3`) in the Javadoc of the method that enforces them.
+Pibble is a modular monolith. Each bounded context (`iam`, `organization`, `customers`, `booking`, `conversations`, `assistant`) is a direct subpackage of `com.takodu.api` with the same four layers; [docs/architecture.md](../../../docs/architecture.md) lists what each owns and which contexts it may depend on. `ArchitectureTest` enforces the dependency and naming rules marked **[enforced]**; review enforces the rest. When this skill and the code disagree, the code is wrong unless a decision record in `docs/decisions/implemented/` says otherwise. Business rules come from the product docs (`../docs/03-business-domain.md`); cite their id (`B3`) in the Javadoc of the method that enforces them.
 
 Use [takodu-feature](../takodu-feature/SKILL.md) for the step order of a new capability, [takodu-fix](../takodu-fix/SKILL.md) for defects, [takodu-context-integration](../takodu-context-integration/SKILL.md) whenever code in one context needs another context, and [takodu-tenancy](../takodu-tenancy/SKILL.md) for anything that reads the caller's organization. Copy class shapes from [references/templates.md](references/templates.md).
 
@@ -83,6 +83,8 @@ The arrows point inward: `interfaces → application → domain ← infrastructu
 | `BusinessRuleViolationException` | 422 | invariant or state transition refused |
 | `AccessDeniedException` | 403 | role or establishment does not allow the action |
 | `PlanInactiveException` | 402 | organization plan inactive (O6) |
+| `AuthenticationFailedException` | 401 | sign-in code or refresh token wrong, used or expired |
+| `TooManyRequestsException` | 429 | rate limit of a business rule (I3) |
 | `IllegalArgumentException` | 400 | value object or command argument invalid |
 
 Never throw `jakarta.ws.rs.*Exception`, return `null` for a business failure, or rethrow a vaguer exception. A database constraint that guards an invariant (exclusion, partial unique index) is translated by the repository adapter into the context's exception, by SQL state.

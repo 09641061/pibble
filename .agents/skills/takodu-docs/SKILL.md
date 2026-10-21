@@ -53,7 +53,7 @@ Write one only when a choice had real alternatives and someone could reasonably 
 
 ## Commits, branches and pull requests
 
-Conventional Commits: `<type>(<scope>): <imperative summary>`. Types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `perf`. The scope is the bounded context (`identity`, `organization`, `customers`, `booking`, `conversations`, `assistant`), `shared`, or `arch`. One logical change per commit, with code and its docs together. No body, or one short line; never a `Co-Authored-By` or other attribution trailer. The `commit-msg` hook and CI run `scripts/check-commit-msg.sh`.
+Conventional Commits: `<type>(<scope>): <imperative summary>`. Types: `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `perf`. The scope is the bounded context (`iam`, `organization`, `customers`, `booking`, `conversations`, `assistant`), `shared`, or `arch`. One logical change per commit, with code and its docs together. No body, or one short line; never a `Co-Authored-By` or other attribution trailer. The `commit-msg` hook and CI run `scripts/check-commit-msg.sh`.
 
 - Branches: `<type>/<topic>` for people; an agent prefixes its name (`claude/fix-reminder-timezone`, `codex/feat-inbox-assign`), so agent work shows in branch names, not commit metadata. An agent in a parallel git worktree uses the same name for the worktree.
 - Pull requests are merged with their commits kept, not squashed, so each commit must pass the checks on its own.

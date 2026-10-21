@@ -8,9 +8,9 @@ The legacy backend had thirteen contexts drawn by noun (profiles, media, audit, 
 
 ## Proposal
 
-Pibble has six contexts, cut around invariants and language: `identity` (who can sign in), `organization` (organizations, establishments with opening hours, members with roles, services with their performers), `customers` (a person identified by phone in an organization), `booking` (appointments, time blocks, availability), `conversations` (WhatsApp lines, conversations, messages, scheduled messages) and `assistant` (settings and turns). The context map and the allowed dependencies are in [architecture.md](../../architecture.md) and in `ArchitectureTest.ALLOWED_DEPENDENCIES`.
+Pibble has six contexts, cut around invariants and language: `iam` (who can sign in), `organization` (organizations, establishments with opening hours, members with roles, services with their performers), `customers` (a person identified by phone in an organization), `booking` (appointments, time blocks, availability), `conversations` (WhatsApp lines, conversations, messages, scheduled messages) and `assistant` (settings and turns). The context map and the allowed dependencies are in [architecture.md](../../architecture.md) and in `ArchitectureTest.ALLOWED_DEPENDENCIES`.
 
-- **Members live in `organization`, not `identity`:** a user is who can sign in; a member is who works here and with which role.
+- **Members live in `organization`, not `iam`:** a user is who can sign in; a member is who works here and with which role.
 - **Services live in `organization`:** they are establishment configuration edited by the same people as opening hours and staff; a separate catalog had no invariants of its own.
 - **`customers` is separate from `conversations`:** staff create customers without WhatsApp, and `booking` needs customers without chats.
 - **`assistant` is separate from `conversations`:** the inbox works with the assistant disabled, and turns, the LLM and tools have their own lifecycle.
