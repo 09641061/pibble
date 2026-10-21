@@ -15,6 +15,8 @@ import java.util.Set;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 /**
@@ -84,6 +86,20 @@ class ArchitectureTest {
     static final ArchRule no_cycles_between_contexts = slices()
             .matching(BASE + ".(*)..")
             .should().beFreeOfCycles();
+
+    @ArchTest
+    static final ArchRule aggregates_have_no_setters = noMethods()
+            .that().areDeclaredInClassesThat().resideInAnyPackage("..domain.model.aggregates..", "..domain.model.entities..")
+            .and().arePublic()
+            .should().haveNameMatching("set[A-Z].*")
+            .because("every state change is a method with a business name that checks its invariant");
+
+    @ArchTest
+    static final ArchRule aggregates_have_no_public_mutable_fields = noFields()
+            .that().areDeclaredInClassesThat().resideInAnyPackage("..domain.model.aggregates..", "..domain.model.entities..")
+            .and().arePublic()
+            .should().notBeFinal()
+            .because("state is changed only through the aggregate's methods");
 
     @ArchTest
     static final ArchRule controllers_are_named_controller = classes()
