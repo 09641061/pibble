@@ -5,7 +5,9 @@ import com.takodu.api.customers.application.queryservices.CustomerQueryService;
 import com.takodu.api.customers.domain.exceptions.CustomerNotFoundException;
 import com.takodu.api.customers.domain.model.commands.DeleteCustomerCommand;
 import com.takodu.api.customers.domain.model.queries.GetCustomerByIdQuery;
+import com.takodu.api.customers.domain.model.queries.SearchCustomersQuery;
 import com.takodu.api.customers.interfaces.rest.resources.CustomerDetailsResource;
+import com.takodu.api.customers.interfaces.rest.resources.CustomerPageResource;
 import com.takodu.api.customers.interfaces.rest.resources.CustomerResource;
 import com.takodu.api.customers.interfaces.rest.resources.RegisterCustomerResource;
 import com.takodu.api.customers.interfaces.rest.transform.CustomerResourceFromEntityAssembler;
@@ -14,8 +16,11 @@ import com.takodu.api.customers.interfaces.rest.transform.UpdateCustomerCommandF
 import com.takodu.api.shared.application.tenancy.TenantContext;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
@@ -23,6 +28,7 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
@@ -46,6 +52,18 @@ public class CustomersController {
         this.customerCommandService = customerCommandService;
         this.customerQueryService = customerQueryService;
         this.tenantContext = tenantContext;
+    }
+
+    @GET
+    @Operation(summary = "Search customers", description = "Active customers by display name. Digits in q also match the phone.")
+    @APIResponse(responseCode = "200", description = "One page of customers",
+            content = @Content(schema = @Schema(implementation = CustomerPageResource.class)))
+    @APIResponse(responseCode = "400", description = "page below 0, or size outside 1-100")
+    public CustomerPageResource search(@QueryParam("q") String q,
+                                       @QueryParam("page") @DefaultValue("0") @Min(0) int page,
+                                       @QueryParam("size") @DefaultValue("20") @Min(1) @Max(SearchCustomersQuery.MAX_SIZE) int size) {
+        var result = customerQueryService.handle(new SearchCustomersQuery(tenantContext.organizationId(), q, page, size));
+        return CustomerResourceFromEntityAssembler.toPageResourceFromEntity(result, page, size);
     }
 
     @POST

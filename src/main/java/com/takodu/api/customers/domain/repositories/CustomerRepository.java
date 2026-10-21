@@ -6,6 +6,7 @@ import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface CustomerRepository {
@@ -13,6 +14,13 @@ public interface CustomerRepository {
     Optional<Customer> findActiveById(OrganizationId organizationId, CustomerId customerId);
 
     Optional<Customer> findActiveByPhone(OrganizationId organizationId, PhoneNumber phone);
+
+    /**
+     * @param text matched, ignoring case, inside the name and the WhatsApp name, and its digits inside the phone;
+     *        blank matches every active customer
+     * @return active customers by display name
+     */
+    List<Customer> search(OrganizationId organizationId, String text, int offset, int limit);
 
     Optional<Customer> findByIdempotencyKey(OrganizationId organizationId, IdempotencyKey idempotencyKey);
 

@@ -13,6 +13,7 @@ import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.hibernate.exception.ConstraintViolationException;
 
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -36,6 +37,13 @@ public class CustomerRepositoryImpl implements CustomerRepository {
     public Optional<Customer> findActiveByPhone(OrganizationId organizationId, PhoneNumber phone) {
         return customerPersistenceRepository.findActiveByPhone(organizationId.value(), phone.e164())
                 .map(CustomerPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<Customer> search(OrganizationId organizationId, String text, int offset, int limit) {
+        return customerPersistenceRepository.search(organizationId.value(), text, offset, limit).stream()
+                .map(CustomerPersistenceAssembler::toDomainFromPersistence)
+                .toList();
     }
 
     @Override

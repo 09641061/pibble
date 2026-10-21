@@ -18,7 +18,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -193,6 +195,43 @@ class CustomersControllerTest {
         delete(TestTenants.owner(), id).statusCode(404);
     }
 
+    @Test
+    void searchMatchesNameWhatsappNameOrTypedDigits() {
+        var owner = TestTenants.owner();
+        var rosa = body("987654321");
+        rosa.put("name", "Rosa Quispe");
+        register(owner, UUID.randomUUID(), rosa).statusCode(201);
+        var ana = body("+57 300 123 4567");
+        ana.put("name", "Ana 100% real");
+        register(owner, UUID.randomUUID(), ana).statusCode(201);
+        registered(owner, "912345678");
+
+        search(owner, Map.of("q", "quispe")).body("items.displayName", contains("Rosa Quispe"));
+        search(owner, Map.of("q", "987 654")).body("items.displayName", contains("Rosa Quispe"));
+        search(owner, Map.of("q", "100%")).body("items.displayName", contains("Ana 100% real"));
+        search(owner, Map.of("q", "1_0")).body("items", hasSize(0));
+        search(owner, Map.of()).body("items.displayName", contains("+51912345678", "Ana 100% real", "Rosa Quispe"));
+    }
+
+    @Test
+    void searchPagesAndSkipsDeletedCustomers() {
+        var owner = TestTenants.owner();
+        registered(owner, "911111111");
+        registered(owner, "922222222");
+        delete(owner, registered(owner, "933333333")).statusCode(204);
+
+        search(owner, Map.of("size", 1)).body("items.phone", contains("+51911111111")).body("hasMore", equalTo(true));
+        search(owner, Map.of("size", 1, "page", 1)).body("items.phone", contains("+51922222222")).body("hasMore", equalTo(false));
+        search(owner, Map.of("size", 101)).statusCode(400);
+    }
+
+    @Test
+    void searchSeesOnlyTheCallersOrganization() {
+        registered(TestTenants.owner(), "987654321");
+
+        search(TestTenants.staffOf(TestTenants.owner()), Map.of("q", "987")).body("items", hasSize(0));
+    }
+
     static Map<String, Object> body(String phone) {
         var body = new HashMap<String, Object>();
         body.put("phone", phone);
@@ -203,6 +242,10 @@ class CustomersControllerTest {
         return given().spec(tenant.spec()).header("Idempotency-Key", key.toString())
                 .contentType(ContentType.JSON).body(body)
                 .post("/api/v1/customers").then();
+    }
+
+    static ValidatableResponse search(TestTenant tenant, Map<String, ?> params) {
+        return given().spec(tenant.spec()).queryParams(params).get("/api/v1/customers").then();
     }
 
     static ValidatableResponse update(TestTenant tenant, String id, Map<String, Object> body) {
