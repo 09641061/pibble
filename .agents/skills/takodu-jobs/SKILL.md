@@ -71,7 +71,7 @@ Insert with the domain check first; the unique constraint catches the race ([tak
 
 ## Time
 
-Inject `java.time.Clock` (one `@Produces` `Clock.systemUTC()` bean in `shared.infrastructure`), pass `clock.instant()` into domain methods, and never call `Instant.now()` in a job or domain class. Tests replace the clock with a mutable test clock to move past `send_at` or a 12-hour pause.
+Inject `java.time.Clock` (UTC, from `shared.infrastructure.time.ClockProducer`), pass `clock.instant()` into domain methods, and never call `Instant.now()` in a job or domain class. In a `@QuarkusTest` the clock is `TestClock`: `set` or `advance` it past `send_at` or a 12-hour pause, then `reset()` it.
 
 ## Tests
 
