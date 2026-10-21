@@ -12,7 +12,8 @@ Every row belongs to one organization, and a caller may act only inside the orga
 | Piece | Package | Job |
 |---|---|---|
 | `TenantContext` | `shared.application.tenancy` | `@RequestScoped`: `userId()`, `organizationId()`, `memberId()`, `role()`, `establishmentIds()`, `canSee(EstablishmentId)` |
-| `Role`, `Action`, `AccessPolicy` | `shared.application.tenancy` | Fixed permission table; `require(Action)` and `requireEstablishment(EstablishmentId)` throw `AccessDeniedException` |
+| `Role` | `shared.domain.model.valueobjects` | `owner`, `manager`, `staff`; the `Member` aggregate and `TenantContext` share it |
+| `Action`, `AccessPolicy` | `shared.application.tenancy` | Fixed permission table; `require(Action)` and `requireEstablishment(EstablishmentId)` throw `AccessDeniedException` |
 | `TenantFilter` | `organization.interfaces.rest.filters` | Reads the JWT subject and `X-Organization-Id`, loads the active membership, fills `TenantContext` or answers 403 |
 | `TestTenants` | `src/test/java/com/takodu/api/shared/testing` | Creates user, organization and membership per role; returns an authenticated `RequestSpecification` |
 
@@ -31,10 +32,12 @@ package com.takodu.api.shared.application.tenancy;
 /** Fixed permissions per role (product docs §5). Changing a row is a product decision. */
 public enum Action {
     MANAGE_ORGANIZATION(Role.OWNER),
+    MANAGE_ESTABLISHMENTS(Role.OWNER),
     CONNECT_WHATSAPP(Role.OWNER),
     MANAGE_SERVICES_AND_HOURS(Role.OWNER, Role.MANAGER),
     MANAGE_MEMBERS(Role.OWNER, Role.MANAGER),
     MANAGE_ANY_CALENDAR(Role.OWNER, Role.MANAGER),
+    MANAGE_OWN_TIME_BLOCKS(Role.OWNER, Role.MANAGER, Role.STAFF),
     BOOK_APPOINTMENTS(Role.OWNER, Role.MANAGER, Role.STAFF),
     REPLY_IN_INBOX(Role.OWNER, Role.MANAGER, Role.STAFF),
     EDIT_CUSTOMERS(Role.OWNER, Role.MANAGER, Role.STAFF),
@@ -48,23 +51,7 @@ public enum Action {
 }
 ```
 
-```java
-@RequestScoped
-public class AccessPolicy {
-    private final TenantContext tenantContext;
-
-    public AccessPolicy(TenantContext tenantContext) { this.tenantContext = tenantContext; }
-
-    public void require(Action action) {
-        if (!action.allows(tenantContext.role())) throw new AccessDeniedException(action.name().toLowerCase().replace('_', ' '));
-    }
-
-    /** O13: staff see only assigned establishments; owners and managers see all. */
-    public void requireEstablishment(EstablishmentId establishmentId) {
-        if (!tenantContext.canSee(establishmentId)) throw new AccessDeniedException("access this establishment");
-    }
-}
-```
+`AccessPolicy` (same package) checks `tenantContext.role()` against the table and `canSee(id)` for the establishment.
 
 ## Scoping rules
 
