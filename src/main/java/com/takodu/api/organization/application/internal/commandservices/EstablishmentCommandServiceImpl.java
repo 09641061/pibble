@@ -8,6 +8,7 @@ import com.takodu.api.organization.domain.model.aggregates.Establishment;
 import com.takodu.api.organization.domain.model.commands.ArchiveEstablishmentCommand;
 import com.takodu.api.organization.domain.model.commands.DescribeEstablishmentCommand;
 import com.takodu.api.organization.domain.model.commands.OpenEstablishmentCommand;
+import com.takodu.api.organization.domain.model.commands.ReplaceOpeningHoursCommand;
 import com.takodu.api.organization.domain.repositories.EstablishmentRepository;
 import com.takodu.api.organization.domain.repositories.OrganizationRepository;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
@@ -55,9 +56,18 @@ public class EstablishmentCommandServiceImpl implements EstablishmentCommandServ
     public Establishment handle(DescribeEstablishmentCommand command) {
         accessPolicy.require(Action.MANAGE_ESTABLISHMENTS);
         requireActivePlan(command.organizationId());
-        var establishment = load(command.organizationId(), command.establishmentId());
-        if (!establishment.isActive()) throw new EstablishmentArchivedException(establishment.getId());
+        var establishment = loadActive(command.organizationId(), command.establishmentId());
         establishment.describe(command.name(), command.address(), command.timeZone());
+        return establishmentRepository.save(establishment);
+    }
+
+    @Override
+    @Transactional
+    public Establishment handle(ReplaceOpeningHoursCommand command) {
+        accessPolicy.require(Action.MANAGE_SERVICES_AND_HOURS);
+        requireActivePlan(command.organizationId());
+        var establishment = loadActive(command.organizationId(), command.establishmentId());
+        establishment.replaceSchedule(command.schedule());
         return establishmentRepository.save(establishment);
     }
 
@@ -73,6 +83,12 @@ public class EstablishmentCommandServiceImpl implements EstablishmentCommandServ
     private Establishment load(OrganizationId organizationId, EstablishmentId establishmentId) {
         return establishmentRepository.findById(organizationId, establishmentId)
                 .orElseThrow(() -> new EstablishmentNotFoundException(establishmentId));
+    }
+
+    private Establishment loadActive(OrganizationId organizationId, EstablishmentId establishmentId) {
+        var establishment = load(organizationId, establishmentId);
+        if (!establishment.isActive()) throw new EstablishmentArchivedException(establishmentId);
+        return establishment;
     }
 
     private void requireActivePlan(OrganizationId organizationId) {

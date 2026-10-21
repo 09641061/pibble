@@ -1,6 +1,7 @@
 package com.takodu.api.organization.domain.model.aggregates;
 
 import com.takodu.api.organization.domain.model.valueobjects.IanaZone;
+import com.takodu.api.organization.domain.model.valueobjects.WeeklySchedule;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
@@ -19,6 +20,7 @@ public class Establishment {
     private String name;
     private String address;
     private IanaZone timeZone;
+    private WeeklySchedule schedule;
     private Instant archivedAt;
     private final IdempotencyKey idempotencyKey;
 
@@ -29,17 +31,19 @@ public class Establishment {
      */
     public static Establishment open(OrganizationId organizationId, String name, String address, IanaZone timeZone,
                                      IdempotencyKey idempotencyKey) {
-        return new Establishment(null, organizationId, name, address, timeZone, null, idempotencyKey);
+        return new Establishment(null, organizationId, name, address, timeZone, WeeklySchedule.CLOSED, null,
+                idempotencyKey);
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
     public Establishment(EstablishmentId id, OrganizationId organizationId, String name, String address,
-                         IanaZone timeZone, Instant archivedAt, IdempotencyKey idempotencyKey) {
+                         IanaZone timeZone, WeeklySchedule schedule, Instant archivedAt, IdempotencyKey idempotencyKey) {
         this.id = id;
         this.organizationId = Objects.requireNonNull(organizationId, "organizationId is required");
         this.name = requireName(name);
         this.address = blankToNull(address);
         this.timeZone = Objects.requireNonNull(timeZone, "timeZone is required");
+        this.schedule = Objects.requireNonNull(schedule, "schedule is required");
         this.archivedAt = archivedAt;
         this.idempotencyKey = idempotencyKey;
     }
@@ -52,6 +56,13 @@ public class Establishment {
         this.name = requireName(name);
         this.address = blankToNull(address);
         this.timeZone = Objects.requireNonNull(timeZone, "timeZone is required");
+    }
+
+    /**
+     * O8: replaces the whole week. Appointments already booked outside the new hours stay; the calendar shows them.
+     */
+    public void replaceSchedule(WeeklySchedule schedule) {
+        this.schedule = Objects.requireNonNull(schedule, "schedule is required");
     }
 
     /** O4: archiving frees the establishment's place in the plan. Archiving twice keeps the first instant. */
