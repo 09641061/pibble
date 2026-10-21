@@ -21,6 +21,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 @QuarkusTest
 class CustomersControllerTest {
@@ -132,6 +133,66 @@ class CustomersControllerTest {
                 .then().statusCode(404).body("code", equalTo("CUSTOMER_NOT_FOUND"));
     }
 
+    @Test
+    void staffEditsACustomerAndLeavingOutAFieldClearsIt() {
+        var owner = TestTenants.owner();
+        var staff = TestTenants.staffOf(owner);
+        var id = registered(owner, "987654321");
+
+        update(staff, id, Map.of("name", "Rosa Quispe", "documentType", "ruc", "documentNumber", "10456789123",
+                "notes", "Alérgica al tinte")).statusCode(200)
+                .body("displayName", equalTo("Rosa Quispe"))
+                .body("documentNumber", equalTo("10456789123"));
+        update(staff, id, Map.of("name", "Rosa Quispe")).statusCode(200)
+                .body("documentType", nullValue())
+                .body("notes", nullValue())
+                .body("phone", equalTo("+51987654321"));
+    }
+
+    @Test
+    void invalidDocumentIsRefusedOnEdit() {
+        var owner = TestTenants.owner();
+
+        update(owner, registered(owner, "987654321"), Map.of("documentType", "dni", "documentNumber", "123"))
+                .statusCode(400).body("code", equalTo("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void customerOfAnotherOrganizationCannotBeEdited() {
+        var id = registered(TestTenants.owner(), "987654321");
+
+        update(TestTenants.owner(), id, Map.of("name", "Rosa")).statusCode(404).body("code", equalTo("CUSTOMER_NOT_FOUND"));
+    }
+
+    @Test
+    void staffCannotDeleteACustomer() {
+        var owner = TestTenants.owner();
+
+        delete(TestTenants.staffOf(owner), registered(owner, "987654321")).statusCode(403).body("code", equalTo("ACCESS_DENIED"));
+    }
+
+    @Test
+    void managerDeletesACustomerAndThePhoneIsFreeAgain() {
+        var owner = TestTenants.owner();
+        var manager = TestTenants.managerOf(owner);
+        var id = registered(owner, "987654321");
+
+        delete(manager, id).statusCode(204);
+
+        given().spec(owner.spec()).get("/api/v1/customers/" + id).then().statusCode(404);
+        update(owner, id, Map.of("name", "Rosa")).statusCode(404);
+        delete(owner, id).statusCode(404);
+        String again = register(owner, UUID.randomUUID(), body("987654321")).statusCode(201).extract().path("id");
+        assertNotEquals(id, again);
+    }
+
+    @Test
+    void customerOfAnotherOrganizationCannotBeDeleted() {
+        var id = registered(TestTenants.owner(), "987654321");
+
+        delete(TestTenants.owner(), id).statusCode(404);
+    }
+
     static Map<String, Object> body(String phone) {
         var body = new HashMap<String, Object>();
         body.put("phone", phone);
@@ -142,6 +203,15 @@ class CustomersControllerTest {
         return given().spec(tenant.spec()).header("Idempotency-Key", key.toString())
                 .contentType(ContentType.JSON).body(body)
                 .post("/api/v1/customers").then();
+    }
+
+    static ValidatableResponse update(TestTenant tenant, String id, Map<String, Object> body) {
+        return given().spec(tenant.spec()).contentType(ContentType.JSON).body(body)
+                .put("/api/v1/customers/" + id).then();
+    }
+
+    static ValidatableResponse delete(TestTenant tenant, String id) {
+        return given().spec(tenant.spec()).delete("/api/v1/customers/" + id).then();
     }
 
     static String registered(TestTenant tenant, String phone) {

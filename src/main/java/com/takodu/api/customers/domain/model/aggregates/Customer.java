@@ -51,6 +51,22 @@ public class Customer {
         this.idempotencyKey = idempotencyKey;
     }
 
+    /** C4: replaces what staff typed; the phone never changes (C1). */
+    public void updateDetails(String name, IdentityDocument document, String notes) {
+        this.name = requireName(name);
+        this.document = document;
+        this.notes = requireNotes(notes);
+    }
+
+    /** C5: the phone is free again; appointments and conversations keep pointing at this customer. */
+    public void delete(Instant now) {
+        if (deletedAt == null) deletedAt = Objects.requireNonNull(now, "now is required");
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
     /** The name staff see: the typed name, else the WhatsApp profile name, else the phone. */
     public String displayName() {
         if (name != null) return name;
