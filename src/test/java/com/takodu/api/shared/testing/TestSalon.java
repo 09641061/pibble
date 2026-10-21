@@ -31,16 +31,24 @@ public record TestSalon(TestTenant owner, UUID establishmentId, UUID serviceId, 
     public static TestSalon open() {
         var owner = TestTenants.owner();
         var establishmentId = TestTenants.firstEstablishmentOf(owner);
-        var ranges = IntStream.rangeClosed(1, 7)
-                .mapToObj(day -> Map.<String, Object>of("weekday", day, "opensAt", "09:00", "closesAt", "18:00"))
-                .toList();
-        given().spec(owner.spec()).contentType(ContentType.JSON).body(Map.of("ranges", ranges))
+        given().spec(owner.spec()).contentType(ContentType.JSON).body(Map.of("ranges", everyDay()))
                 .put("/api/v1/establishments/" + establishmentId + "/opening-hours").then().statusCode(200);
         String serviceId = given().spec(owner.spec()).header("Idempotency-Key", UUID.randomUUID().toString())
                 .contentType(ContentType.JSON).body(serviceBody(List.of(owner.memberId())))
                 .post("/api/v1/establishments/" + establishmentId + "/services")
                 .then().statusCode(201).extract().path("id");
         return new TestSalon(owner, establishmentId, UUID.fromString(serviceId), registerCustomer(owner));
+    }
+
+    /** @return a second establishment with the same opening hours, on the max plan (O4) */
+    public UUID openSecondEstablishment() {
+        TestTenants.upgradeToMax(owner);
+        String id = given().spec(owner.spec()).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(ContentType.JSON).body(Map.of("name", "Sede Surco"))
+                .post("/api/v1/establishments").then().statusCode(201).extract().path("id");
+        given().spec(owner.spec()).contentType(ContentType.JSON).body(Map.of("ranges", everyDay()))
+                .put("/api/v1/establishments/" + id + "/opening-hours").then().statusCode(200);
+        return UUID.fromString(id);
     }
 
     /** @return a staff member assigned to the establishment, not yet performing the service */
@@ -79,6 +87,12 @@ public record TestSalon(TestTenant owner, UUID establishmentId, UUID serviceId, 
     /** @return today in Lima by the given clock, plus {@code daysAhead} */
     public static LocalDate day(Clock clock, int daysAhead) {
         return LocalDate.ofInstant(clock.instant(), LIMA).plusDays(daysAhead);
+    }
+
+    private static List<Map<String, Object>> everyDay() {
+        return IntStream.rangeClosed(1, 7)
+                .mapToObj(day -> Map.<String, Object>of("weekday", day, "opensAt", "09:00", "closesAt", "18:00"))
+                .toList();
     }
 
     private static Map<String, Object> serviceBody(List<UUID> performerIds) {
