@@ -47,7 +47,7 @@ public class ScheduledMessageDispatcher {
 }
 ```
 
-- **One row per transaction.** The `@Transactional` handler locks the next due row with `SELECT … WHERE status = 'pending' AND send_at <= :now ORDER BY send_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so two instances never take the same row and no lease column is needed.
+- **One row per transaction.** The `@Transactional` handler locks the next due row with `SELECT … WHERE status = 'pending' AND send_at <= :now ORDER BY send_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so two instances never take the same row and no lease column is needed. The repository port method that runs it is annotated `@CrossTenant`, since the job has no organization until it holds the row.
 - **Re-check before acting.** The command handler reloads the row and re-checks the rule that allowed it: appointment still `confirmed`, plan active (O6), line connected (W15), window open for free-form text (W6), conversation not paused (A2). If the rule no longer holds, it marks the row `cancelled` or `skipped` and stops.
 - **Call the port inside that transaction, with a short client timeout**, and record the outcome before commit: `sent` with the `wamid`, or `recordFailure()`. Holding one row lock for one HTTP call is fine at this scale. If the process dies after Meta accepted but before commit, the retry sends again; that rare duplicate is accepted. Webhooks never call an external system. A request calls one only when the user waits for that result (connecting a WhatsApp line, emailing a sign-in code or an invitation), and never while a database transaction is open; everything else is a row that a job processes.
 - **Retries are counted on the row**: `scheduled_messages` and outbound messages stop at 5 attempts (`failed`, shown in the inbox, W14); turns stop at 3 and hand the conversation off (A7). A failure never escapes the job loop; it is logged and the next row runs. A crash rolls the row back to `pending`, so nothing depends on an in-memory flag.
@@ -71,7 +71,7 @@ Insert with the domain check first; the unique constraint catches the race ([tak
 
 ## Time
 
-Inject `java.time.Clock` (one `@Produces` `Clock.systemUTC()` bean in `shared.infrastructure`), pass `clock.instant()` into domain methods, and never call `Instant.now()` in a job or domain class. Tests replace the clock with a mutable test clock to move past `send_at` or a 12-hour pause.
+Inject `java.time.Clock` (UTC, from `shared.infrastructure.time.ClockProducer`), pass `clock.instant()` into domain methods, and never call `Instant.now()` in a job or domain class. In a `@QuarkusTest` the clock is `TestClock`: `set` or `advance` it past `send_at` or a 12-hour pause, then `reset()` it.
 
 ## Tests
 

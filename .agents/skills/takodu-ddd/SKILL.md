@@ -69,11 +69,11 @@ The arrows point inward: `interfaces → application → domain ← infrastructu
 ## Building blocks
 
 - **Value objects** are records that validate and normalize in the compact constructor and throw `IllegalArgumentException` with a client-readable message (the mapper turns it into 400). Wrap every field that has a rule (`PhoneNumber`, `Email`, `CancelReason`) and every identifier (`CustomerId(UUID value)`). Money is `Money(long cents, String currency)`; instants are UTC `Instant`, converted to the establishment's `ZoneId` only for local-time rules (B3). The domain receives the current instant as a parameter; services read it from an injected `java.time.Clock`.
-- **Aggregates** are classes with `@Getter` and no `@Setter`, and carry the `OrganizationId` they belong to. State changes only through intention-revealing methods (`cancel(reason, cancelledBy)`, `pause(until)`) that enforce invariants and throw a domain exception on violation. Two constructors: a creation constructor (or static factory) that sets initial state, and a full rehydration constructor used only by the persistence assembler.
+- **Aggregates** are classes with `@Getter` and no `@Setter` or public non-final field **[enforced]**, and carry the `OrganizationId` they belong to. State changes only through intention-revealing methods (`cancel(reason, cancelledBy)`, `pause(until)`) that enforce invariants and throw a domain exception on violation. Two constructors: a creation constructor (or static factory) that sets initial state, and a full rehydration constructor used only by the persistence assembler.
 - **Entities** live inside one aggregate and are changed only through the root.
 - **Commands and queries** are records in `domain.model`. Commands reject missing or out-of-range arguments in the compact constructor; formats belong to the value objects they carry.
-- **Domain services** hold a rule that spans several aggregates. They are pure: the application service loads data and passes it in.
-- **Repository ports** live in `domain.repositories`, speak in aggregates and value objects, and return `Optional` for single lookups. One repository per aggregate root. **Every method takes the `OrganizationId`** (or an establishment the caller checked against it); there is no unscoped `findById`.
+- **Domain services** hold a rule that spans several aggregates. They are pure: the service loads data and passes it in.
+- **Repository ports** live in `domain.repositories`, speak in aggregates and value objects, and return `Optional` for single lookups. One repository per aggregate root. **Every method takes the `OrganizationId`**, an `EstablishmentId` the caller checked, or the aggregate; there is no unscoped `findById`. Job claims and webhook lookups are `@CrossTenant("<caller>")` instead **[enforced]**.
 - **Domain exceptions** live in `<context>.domain.exceptions` and extend one of the shared ones, which fixes the HTTP status:
 
 | Shared base | Status | Use |
@@ -85,7 +85,7 @@ The arrows point inward: `interfaces → application → domain ← infrastructu
 | `PlanInactiveException` | 402 | organization plan inactive (O6) |
 | `IllegalArgumentException` | 400 | value object or command argument invalid |
 
-Never throw `jakarta.ws.rs.*Exception` or return `null` for a business failure, and never catch an exception only to rethrow a vaguer one. A database constraint that guards an invariant (exclusion, partial unique index) is translated by the repository adapter into the context's exception, by SQL state.
+Never throw `jakarta.ws.rs.*Exception`, return `null` for a business failure, or rethrow a vaguer exception. A database constraint that guards an invariant (exclusion, partial unique index) is translated by the repository adapter into the context's exception, by SQL state.
 
 ## Application services (CQRS)
 
@@ -101,7 +101,7 @@ Never throw `jakarta.ws.rs.*Exception` or return `null` for a business failure, 
 - Value-object columns use an explicit `@Convert(converter = <ValueObject>PersistenceConverter.class)`; never `autoApply`. Enums are stored as lower-case `text` (`in_progress`) through a converter.
 - `<Aggregate>PersistenceRepository implements PanacheRepositoryBase<…, UUID>` holds queries. Use `left join fetch` for collections that the assembler reads.
 - `<Aggregate>RepositoryImpl` implements the domain port and maps every result through the static `<Aggregate>PersistenceAssembler`. `save` calls `persist` when the aggregate has no id and `getEntityManager().merge` otherwise, flushes when a constraint must surface, then returns the mapped entity.
-- Never return a persistence entity outside `infrastructure`, and never put JPA annotations on a domain class.
+- Never return a persistence entity outside `infrastructure` or put JPA annotations on a domain class.
 
 ## REST
 
@@ -110,7 +110,7 @@ Never throw `jakarta.ws.rs.*Exception` or return `null` for a business failure, 
 - Request resources carry Bean Validation annotations and the controller parameter is `@Valid`. Response resources are flat records of primitives and strings.
 - Every endpoint has `@Operation`, one `@APIResponse` per status it can return, and `@Tag` on the class.
 - Single lookups end with `.orElseThrow(() -> new <Aggregate>NotFoundException(id))`.
-- Every POST a person can retry takes the `@HeaderParam("Idempotency-Key") UUID` and passes it into the command as `IdempotencyKey`; creations store it on the row and return the existing aggregate on a repeat, transitions keep `lastIdempotencyKey` and return the current state on a repeat ([decision](../../../docs/decisions/proposed/2026-10-20-idempotency-keys-on-retried-requests.md)).
+- Every POST takes `@HeaderParam("Idempotency-Key") UUID` into the command's `IdempotencyKey`, or states why a repeat is harmless in `@WithoutIdempotencyKey("…")` **[enforced]**. Creations store the key and return the existing aggregate on a repeat; transitions keep `lastIdempotencyKey` and return the current state ([decision](../../../docs/decisions/proposed/2026-10-20-idempotency-keys-on-retried-requests.md)).
 - Fields that grant authority (organization, role, owner, `createdBy`) never come from a request body; the controller reads them from `TenantContext` and puts them in the command.
 
 ## Review checklist

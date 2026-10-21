@@ -5,21 +5,18 @@ description: How to create and change the PostgreSQL schema of the pibble backen
 
 # Schema and migrations in pibble
 
-The schema is versioned SQL, and the database guards every invariant that concurrent requests can break. The decisions are [schema migrations](../../../docs/decisions/proposed/2026-10-19-schema-migrations.md) and [the database enforces concurrent invariants](../../../docs/decisions/proposed/2026-10-19-database-enforces-concurrent-invariants.md). The target tables are in the product docs (`../docs/schema.sql`, explained in `../docs/06-database-schema.md`).
+The schema is versioned SQL, and the database guards every invariant that concurrent requests can break. The decisions are [schema migrations](../../../docs/decisions/implemented/2026-10-19-schema-migrations.md) and [the database enforces concurrent invariants](../../../docs/decisions/proposed/2026-10-19-database-enforces-concurrent-invariants.md). The target tables are in the product docs (`../docs/schema.sql`, explained in `../docs/06-database-schema.md`).
 
-## First migration of the project
+## Setup
 
-The first context that needs a table also sets Flyway up, in its own commit (`build(shared): add Flyway migrations`):
-
-1. Add `io.quarkus:quarkus-flyway` to `pom.xml`.
-2. In `application.properties`: `quarkus.flyway.migrate-at-start=true` and `quarkus.hibernate-orm.schema-management.strategy=validate` for every profile; remove the `drop-and-create` lines and the comment that points to the proposal.
-3. Move the migrations decision to `implemented/` as [takodu-docs](../takodu-docs/SKILL.md) describes.
+Flyway runs the migrations at startup in every profile (`quarkus.flyway.migrate-at-start=true`). `SchemaMigrationsTest` checks that nothing is pending and no checksum changed.
 
 ## Files
 
 - Location: `src/main/resources/db/migration`.
-- A context's first file creates all its tables: `V<n>__<context>.sql` (`V1__identity.sql`, `V2__organization.sql`, `V3__customers.sql`, `V4__booking.sql`, `V5__conversations.sql`, `V6__assistant.sql`); build contexts in that order, since later ones reference earlier tables.
-- Every later change is a new file: `V<n>__<context>_<change>.sql` (`V7__booking_add_no_show_reason.sql`). **Never edit a migration that has been committed**; Flyway's checksum fails on every database that ran it.
+- The version is the UTC creation time, `V<yyyyMMddHHmm>__<description>.sql`, so parallel branches never collide. A context's first file creates all its tables (`V202610211430__identity.sql`); every later change is a new file (`V202611031015__booking_add_no_show_reason.sql`). Build contexts in dependency order (identity first, assistant last).
+- If `main` gained a newer migration meanwhile, rename yours to a new timestamp before merging; Flyway refuses a version older than an applied one.
+- **Never edit or rename a migration after it is on `main`**; Flyway's checksum fails on every database that ran it.
 - Copy the context's tables from `../docs/schema.sql`, then apply the conventions below where it differs.
 
 ## Conventions
@@ -31,7 +28,7 @@ The first context that needs a table also sets Flyway up, in its own commit (`bu
 - Soft delete only on `customers.deleted_at`, `members.removed_at` and `establishments.archived_at`; uniqueness on those tables is a partial index `WHERE <column> IS NULL`.
 - Foreign keys across contexts are allowed; name every constraint and index explicitly (`<table>_<what>_uk`, `<table>_<what>_idx`, `<table>_<what>_no_overlap`), because adapters match on the name.
 - Tables created by retried requests get `idempotency_key uuid` with a unique index `<table>_idempotency_uk`; aggregates changed by retried transitions get `last_idempotency_key uuid`.
-- `CREATE EXTENSION IF NOT EXISTS btree_gist;` goes in the first migration that uses an exclusion constraint (`V4__booking.sql`).
+- `CREATE EXTENSION IF NOT EXISTS btree_gist;` goes in the first migration that uses an exclusion constraint (booking's first file).
 
 ## Constraints that guard invariants
 
@@ -70,7 +67,7 @@ Hibernate runs with `validate`, so an entity column without a migration fails at
 
 ## Checklist
 
-- [ ] The change is a new `V<n>__…sql` file; no committed migration was edited.
+- [ ] The change is a new `V<yyyyMMddHHmm>__…sql` file, newer than every migration on `main`; none on `main` was edited.
 - [ ] Constraints and indexes have explicit names that the adapter uses.
 - [ ] The entity, converter and assembler match the migration in the same commit.
 - [ ] Each guarding constraint has a test, and concurrency-sensitive ones have a concurrent test.

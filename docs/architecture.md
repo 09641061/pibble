@@ -18,7 +18,7 @@ Each bounded context is a direct subpackage of `com.takodu.api`. `shared` is the
 
 `ArchitectureTest.ALLOWED_DEPENDENCIES` mirrors the "May depend on" column, and a class in a package missing from it fails the build. Change the table, the map and, for a new context, a decision record in the same commit.
 
-The shared kernel holds the typed identifiers used by several contexts (`OrganizationId`, `EstablishmentId`, `MemberId`, `CustomerId`, `UserId`, `ServiceId`), `Money`, `TimeRange`, the tenancy holder `TenantContext` with `AccessPolicy`, the domain exceptions, `GlobalExceptionMapper`, `ErrorResource` and `AuditableAbstractPersistenceEntity`.
+The shared kernel holds the typed identifiers used by several contexts (`OrganizationId`, `EstablishmentId`, `MemberId`, `CustomerId`, `UserId`, `ServiceId`), `Money`, `TimeRange`, `IdempotencyKey`, the tenancy holder `TenantContext` with `AccessPolicy`, the domain exceptions, `GlobalExceptionMapper`, `ErrorResource`, `AuditableAbstractPersistenceEntity` and the UTC `Clock` producer.
 
 ## Layers inside a context
 
@@ -53,7 +53,7 @@ Scheduled jobs use `quarkus-scheduler` and claim rows with `SELECT … FOR UPDAT
 
 ## Persistence
 
-Each table belongs to one context; foreign keys across contexts are allowed, but no context reads or writes another context's table. Primary keys are UUIDs. Invariants that concurrency can break are also database constraints, and the repository adapter translates their SQL state into a domain exception ([decision](decisions/proposed/2026-10-19-database-enforces-concurrent-invariants.md)). Migrations follow the [migrations decision](decisions/proposed/2026-10-19-schema-migrations.md).
+Each table belongs to one context; foreign keys across contexts are allowed, but no context reads or writes another context's table. Primary keys are UUIDs. Invariants that concurrency can break are also database constraints, and the repository adapter translates their SQL state into a domain exception ([decision](decisions/proposed/2026-10-19-database-enforces-concurrent-invariants.md)). Migrations follow the [migrations decision](decisions/implemented/2026-10-19-schema-migrations.md).
 
 ## HTTP errors
 
