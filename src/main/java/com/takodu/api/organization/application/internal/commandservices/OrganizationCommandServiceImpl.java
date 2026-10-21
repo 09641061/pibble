@@ -5,10 +5,14 @@ import com.takodu.api.organization.application.internal.outboundservices.acl.Ext
 import com.takodu.api.organization.domain.model.aggregates.Establishment;
 import com.takodu.api.organization.domain.model.aggregates.Member;
 import com.takodu.api.organization.domain.model.aggregates.Organization;
+import com.takodu.api.organization.domain.exceptions.OrganizationNotFoundException;
 import com.takodu.api.organization.domain.model.commands.CreateOrganizationCommand;
+import com.takodu.api.organization.domain.model.commands.RenameOrganizationCommand;
 import com.takodu.api.organization.domain.repositories.EstablishmentRepository;
 import com.takodu.api.organization.domain.repositories.MemberRepository;
 import com.takodu.api.organization.domain.repositories.OrganizationRepository;
+import com.takodu.api.shared.application.tenancy.AccessPolicy;
+import com.takodu.api.shared.application.tenancy.Action;
 import com.takodu.api.shared.domain.exceptions.RequestInProgressException;
 import com.takodu.api.shared.domain.model.valueobjects.Role;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -24,18 +28,20 @@ public class OrganizationCommandServiceImpl implements OrganizationCommandServic
     private final EstablishmentRepository establishmentRepository;
     private final MemberRepository memberRepository;
     private final ExternalIamService externalIamService;
+    private final AccessPolicy accessPolicy;
     private final Clock clock;
     private final Duration trial;
 
     public OrganizationCommandServiceImpl(OrganizationRepository organizationRepository,
                                           EstablishmentRepository establishmentRepository,
                                           MemberRepository memberRepository, ExternalIamService externalIamService,
-                                          Clock clock,
+                                          AccessPolicy accessPolicy, Clock clock,
                                           @ConfigProperty(name = "takodu.organization.trial-days") int trialDays) {
         this.organizationRepository = organizationRepository;
         this.establishmentRepository = establishmentRepository;
         this.memberRepository = memberRepository;
         this.externalIamService = externalIamService;
+        this.accessPolicy = accessPolicy;
         this.clock = clock;
         this.trial = Duration.ofDays(trialDays);
     }
@@ -59,5 +65,16 @@ public class OrganizationCommandServiceImpl implements OrganizationCommandServic
         memberRepository.save(Member.founder(organization.getId(), command.creatorId(), email,
                 command.ownerDisplayName(), now));
         return organization;
+    }
+
+    @Override
+    @Transactional
+    public Organization handle(RenameOrganizationCommand command) {
+        accessPolicy.require(Action.MANAGE_ORGANIZATION);
+        var organization = organizationRepository.findById(command.organizationId())
+                .orElseThrow(() -> new OrganizationNotFoundException(command.organizationId()));
+        organization.requireActivePlan(clock.instant());
+        organization.rename(command.name());
+        return organizationRepository.save(organization);
     }
 }

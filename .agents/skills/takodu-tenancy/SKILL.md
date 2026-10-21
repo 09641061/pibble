@@ -15,7 +15,7 @@ Every row belongs to one organization, and a caller may act only inside the orga
 | `Role` | `shared.domain.model.valueobjects` | `owner`, `manager`, `staff`; the `Member` aggregate and `TenantContext` share it |
 | `Action`, `AccessPolicy` | `shared.application.tenancy` | Fixed permission table; `require(Action)` and `requireEstablishment(EstablishmentId)` throw `AccessDeniedException` |
 | `TenantFilter` | `organization.interfaces.rest.filters` | Reads the JWT subject and `X-Organization-Id`, loads the active membership, fills `TenantContext` or answers 403 |
-| `TestTenants` | `src/test/java/com/takodu/api/shared/testing` | Creates user, organization and membership per role; returns an authenticated `RequestSpecification` |
+| `TestTenants` | `src/test/java/com/takodu/api/shared/testing` | Creates user, organization and membership per role through the endpoints; returns a `TestTenant` with `spec()` |
 
 `TenantContext` sits in `shared` because every context reads it; only `organization` fills it, because `organization` owns memberships. `shared` never imports `organization`: the filter writes into the holder through its setter method `bind(...)`.
 
