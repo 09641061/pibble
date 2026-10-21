@@ -12,8 +12,14 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
 
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -126,6 +132,55 @@ class SessionsControllerTest {
     @Test
     void codeThatIsNotSixDigitsIsInvalidInput() {
         SignIn.submit(SignIn.newEmail(), "12345").statusCode(400);
+    }
+
+    @Test
+    void sessionListShowsEveryDeviceAndMarksTheCallingOne() {
+        var email = SignIn.newEmail();
+        var phone = SignIn.as(email, emailSender).extract().jsonPath();
+        var computer = SignIn.as(email, emailSender).extract().jsonPath();
+
+        given().auth().oauth2(computer.getString("accessToken"))
+                .when().get("/api/v1/auth/sessions")
+                .then().statusCode(200)
+                .body("id", containsInAnyOrder(phone.getString("sessionId"), computer.getString("sessionId")))
+                .body("find { it.current }.id", equalTo(computer.getString("sessionId")));
+    }
+
+    @Test
+    void revokingADeviceEndsItsSessionOnly() {
+        var email = SignIn.newEmail();
+        var phone = SignIn.as(email, emailSender).extract().jsonPath();
+        var computer = SignIn.as(email, emailSender).extract().jsonPath();
+
+        given().auth().oauth2(computer.getString("accessToken"))
+                .when().delete("/api/v1/auth/sessions/" + phone.getString("sessionId"))
+                .then().statusCode(204);
+
+        given().contentType("application/json").body(Map.of("refreshToken", phone.getString("refreshToken")))
+                .when().post("/api/v1/auth/session-refreshes").then().statusCode(401);
+        given().auth().oauth2(computer.getString("accessToken"))
+                .when().get("/api/v1/auth/sessions")
+                .then().body("id", contains(computer.getString("sessionId")));
+    }
+
+    @Test
+    void anotherUsersSessionIsNotFound() {
+        var mine = SignIn.as(SignIn.newEmail(), emailSender).extract().jsonPath();
+        var theirs = SignIn.as(SignIn.newEmail(), emailSender).extract().jsonPath();
+
+        given().auth().oauth2(mine.getString("accessToken"))
+                .when().delete("/api/v1/auth/sessions/" + theirs.getString("sessionId"))
+                .then().statusCode(404).body("code", equalTo("SESSION_NOT_FOUND"));
+        given().auth().oauth2(theirs.getString("accessToken"))
+                .when().get("/api/v1/auth/sessions")
+                .then().body("$", hasSize(1));
+    }
+
+    @Test
+    void sessionEndpointsRequireAnAccessToken() {
+        given().when().get("/api/v1/auth/sessions").then().statusCode(401);
+        given().when().delete("/api/v1/auth/sessions/" + UUID.randomUUID()).then().statusCode(401);
     }
 
     private static String wrong(String code) {

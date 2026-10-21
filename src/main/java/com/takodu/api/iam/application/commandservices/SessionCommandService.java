@@ -3,7 +3,10 @@ package com.takodu.api.iam.application.commandservices;
 import com.takodu.api.iam.domain.exceptions.InvalidLoginCodeException;
 import com.takodu.api.iam.domain.exceptions.InvalidRefreshTokenException;
 import com.takodu.api.iam.domain.exceptions.UserDisabledException;
+import com.takodu.api.iam.domain.exceptions.SessionNotFoundException;
+import com.takodu.api.iam.domain.model.aggregates.Session;
 import com.takodu.api.iam.domain.model.commands.RefreshSessionCommand;
+import com.takodu.api.iam.domain.model.commands.RevokeSessionCommand;
 import com.takodu.api.iam.domain.model.commands.SignInCommand;
 
 public interface SessionCommandService {
@@ -29,4 +32,13 @@ public interface SessionCommandService {
      * @throws UserDisabledException when the user is disabled (I6)
      */
     SignedInSession handle(RefreshSessionCommand command);
+
+    /**
+     * Signs a device out (I5). Revoking an already revoked session changes nothing.
+     *
+     * @param command the caller and the session to end
+     * @return the revoked session
+     * @throws SessionNotFoundException when the session does not belong to the caller
+     */
+    Session handle(RevokeSessionCommand command);
 }

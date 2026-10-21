@@ -5,10 +5,12 @@ import com.takodu.api.iam.application.commandservices.SignedInSession;
 import com.takodu.api.iam.application.internal.outboundservices.tokens.AccessTokenIssuer;
 import com.takodu.api.iam.domain.exceptions.InvalidLoginCodeException;
 import com.takodu.api.iam.domain.exceptions.InvalidRefreshTokenException;
+import com.takodu.api.iam.domain.exceptions.SessionNotFoundException;
 import com.takodu.api.iam.domain.model.aggregates.LoginCode;
 import com.takodu.api.iam.domain.model.aggregates.Session;
 import com.takodu.api.iam.domain.model.aggregates.User;
 import com.takodu.api.iam.domain.model.commands.RefreshSessionCommand;
+import com.takodu.api.iam.domain.model.commands.RevokeSessionCommand;
 import com.takodu.api.iam.domain.model.commands.SignInCommand;
 import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
 import com.takodu.api.iam.domain.repositories.LoginCodeRepository;
@@ -82,6 +84,15 @@ public class SessionCommandServiceImpl implements SessionCommandService {
         var user = userRepository.findById(session.getUserId()).orElseThrow(InvalidRefreshTokenException::new);
         user.requireEnabled();
         return new SignedInSession(user, session, refreshToken, accessTokenIssuer.issue(user.getId(), session.getId(), now));
+    }
+
+    @Override
+    @Transactional
+    public Session handle(RevokeSessionCommand command) {
+        var session = sessionRepository.findByIdAndUser(command.sessionId(), command.userId())
+                .orElseThrow(() -> new SessionNotFoundException(command.sessionId()));
+        session.revoke(clock.instant());
+        return sessionRepository.save(session);
     }
 
     private void consume(LoginCode code, Instant now) {
