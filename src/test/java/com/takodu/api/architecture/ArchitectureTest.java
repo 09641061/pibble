@@ -115,6 +115,7 @@ class ArchitectureTest {
             .that().areDeclaredInClassesThat().resideInAPackage("..domain.repositories..")
             .and().areDeclaredInClassesThat().areInterfaces()
             .and().areDeclaredInClassesThat().areNotAnnotations()
+            .and().areDeclaredInClassesThat().resideOutsideOfPackage(BASE + ".iam..")
             .should(beScopedByOrganization())
             .because("an id from another organization must find nothing (takodu-tenancy)");
 
@@ -217,7 +218,8 @@ class ArchitectureTest {
     }
 
     /**
-     * A repository method takes an {@code OrganizationId}, an {@code EstablishmentId} or an aggregate (which
+     * {@code iam} is exempt: users exist above organizations, and its lookups are scoped by the user or by the
+     * secret the caller presents. A repository method takes an {@code OrganizationId}, an {@code EstablishmentId} or an aggregate (which
      * carries its organization), or is marked {@code @CrossTenant} for a job or webhook.
      */
     private static ArchCondition<JavaMethod> beScopedByOrganization() {
