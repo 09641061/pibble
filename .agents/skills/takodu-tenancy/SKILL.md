@@ -55,7 +55,7 @@ public enum Action {
 
 ## Scoping rules
 
-- **Every repository port method takes the `OrganizationId`**, or an `EstablishmentId` the service already checked belongs to the organization. `findById(id)` without a tenant does not exist; an id from another organization returns empty, which the controller turns into 404. Only job claims and webhook lookups go without it, annotated `shared.domain.repositories.CrossTenant`; `ArchitectureTest` enforces both. `iam` is exempt: a user belongs to no organization, so its repositories are scoped by `UserId` or by the code or token presented.
+- **Every repository port method takes the `OrganizationId`**, or an `EstablishmentId` the service already checked belongs to the organization. `findById(id)` without a tenant does not exist; an id from another organization returns empty, which the controller turns into 404. Only job claims, webhook lookups and a signed-in user's lookups before choosing an organization (their memberships, an invitation token) go without it, annotated `shared.domain.repositories.CrossTenant`; `ArchitectureTest` enforces both. `iam` is exempt: a user belongs to no organization, so its repositories are scoped by `UserId` or by the code or token presented.
 - List endpoints for establishment data (calendar, inbox) filter by `tenantContext.establishmentIds()` for `staff`.
 - 404 versus 403: a row in another organization is 404 (do not reveal it exists); a row in the caller's organization that their role or establishment forbids is 403.
 - Facades take `organizationId` as their first parameter, so the supplier keeps scoping its own queries.
