@@ -25,4 +25,7 @@ public interface SessionRepository {
     Optional<Session> findByIdAndUser(SessionId sessionId, UserId userId);
 
     Session save(Session session);
+
+    /** @return how many sessions that expired or were revoked before {@code instant} were deleted */
+    long deleteEndedBefore(Instant instant);
 }

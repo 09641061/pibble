@@ -13,6 +13,10 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class SessionPersistenceRepository implements PanacheRepositoryBase<SessionPersistenceEntity, UUID> {
+    public long deleteEndedBefore(Instant instant) {
+        return delete("expiresAt < ?1 or revokedAt < ?1", instant);
+    }
+
     public List<SessionPersistenceEntity> findActiveByUser(UUID userId, Instant now) {
         return list("userId = ?1 and revokedAt is null and expiresAt > ?2 order by lastUsedAt desc", userId, now);
     }

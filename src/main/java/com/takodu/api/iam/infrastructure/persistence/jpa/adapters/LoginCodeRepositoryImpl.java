@@ -32,6 +32,11 @@ public class LoginCodeRepositoryImpl implements LoginCodeRepository {
     }
 
     @Override
+    public long deleteExpiredBefore(Instant instant) {
+        return loginCodePersistenceRepository.deleteExpiredBefore(instant);
+    }
+
+    @Override
     public LoginCode save(LoginCode loginCode) {
         var entity = LoginCodePersistenceAssembler.toPersistenceFromDomain(loginCode);
         if (entity.getId() == null) {

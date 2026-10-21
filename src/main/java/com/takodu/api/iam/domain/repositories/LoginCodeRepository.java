@@ -22,4 +22,7 @@ public interface LoginCodeRepository {
     List<LoginCode> findUsableForUpdate(Email email, Instant now);
 
     LoginCode save(LoginCode loginCode);
+
+    /** @return how many codes that expired before {@code instant} were deleted */
+    long deleteExpiredBefore(Instant instant);
 }

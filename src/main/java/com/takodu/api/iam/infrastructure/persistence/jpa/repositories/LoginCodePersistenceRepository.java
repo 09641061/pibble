@@ -18,6 +18,10 @@ public class LoginCodePersistenceRepository implements PanacheRepositoryBase<Log
                 .list();
     }
 
+    public long deleteExpiredBefore(Instant instant) {
+        return delete("expiresAt < ?1", instant);
+    }
+
     public long countExpiringAfter(Email email, Instant instant) {
         return count("email = ?1 and expiresAt >= ?2", email, instant);
     }

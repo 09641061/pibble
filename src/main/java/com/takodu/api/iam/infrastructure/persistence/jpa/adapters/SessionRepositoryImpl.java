@@ -41,6 +41,11 @@ public class SessionRepositoryImpl implements SessionRepository {
     }
 
     @Override
+    public long deleteEndedBefore(Instant instant) {
+        return sessionPersistenceRepository.deleteEndedBefore(instant);
+    }
+
+    @Override
     public Session save(Session session) {
         var entity = SessionPersistenceAssembler.toPersistenceFromDomain(session);
         if (entity.getId() == null) {
