@@ -39,6 +39,11 @@ public class AppointmentPersistenceRepository implements PanacheRepositoryBase<A
                 + " and status in :statuses and startsAt < :end and endsAt > :start order by startsAt, id", parameters);
     }
 
+    public List<AppointmentPersistenceEntity> findUpcomingByMember(UUID organizationId, UUID memberId, Instant after) {
+        return list("organizationId = ?1 and staffMemberId = ?2 and status = ?3 and startsAt > ?4 order by startsAt, id",
+                organizationId, memberId, AppointmentStatus.CONFIRMED, after);
+    }
+
     public List<AppointmentPersistenceEntity> findByEstablishment(UUID organizationId, UUID establishmentId,
                                                                   Instant start, Instant end) {
         return list("organizationId = ?1 and establishmentId = ?2 and startsAt < ?4 and endsAt > ?3 order by startsAt, id",

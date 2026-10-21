@@ -8,6 +8,7 @@ import com.takodu.api.booking.domain.model.aggregates.Appointment;
 import com.takodu.api.booking.domain.model.queries.GetAppointmentByIdQuery;
 import com.takodu.api.booking.domain.model.queries.GetAppointmentsByEstablishmentQuery;
 import com.takodu.api.booking.domain.model.queries.GetAvailableSlotsQuery;
+import com.takodu.api.booking.domain.model.queries.GetUpcomingAppointmentsByMemberQuery;
 import com.takodu.api.booking.domain.model.valueobjects.Slot;
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
 
@@ -35,4 +36,7 @@ public interface AppointmentQueryService {
      * @throws CustomerNotFoundException when the customer is deleted or not in the organization
      */
     List<Slot> handle(GetAvailableSlotsQuery query);
+
+    /** @return the member's confirmed appointments starting after the query's instant, earliest first */
+    List<Appointment> handle(GetUpcomingAppointmentsByMemberQuery query);
 }

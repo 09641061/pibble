@@ -8,6 +8,7 @@ import com.takodu.api.booking.domain.model.aggregates.Appointment;
 import com.takodu.api.booking.domain.model.queries.GetAppointmentByIdQuery;
 import com.takodu.api.booking.domain.model.queries.GetAppointmentsByEstablishmentQuery;
 import com.takodu.api.booking.domain.model.queries.GetAvailableSlotsQuery;
+import com.takodu.api.booking.domain.model.queries.GetUpcomingAppointmentsByMemberQuery;
 import com.takodu.api.booking.domain.model.valueobjects.BookingSource;
 import com.takodu.api.booking.domain.model.valueobjects.Slot;
 import com.takodu.api.booking.domain.repositories.AppointmentRepository;
@@ -75,5 +76,10 @@ public class AppointmentQueryServiceImpl implements AppointmentQueryService {
                 appointmentRepository.findOccupying(query.organizationId(), service.performers(), query.customerId(), day),
                 clock.instant());
         return slotFinder.find(context, query.date(), query.customerId(), query.staffMemberId(), BookingSource.STAFF);
+    }
+
+    @Override
+    public List<Appointment> handle(GetUpcomingAppointmentsByMemberQuery query) {
+        return appointmentRepository.findUpcomingByMember(query.organizationId(), query.memberId(), query.now());
     }
 }

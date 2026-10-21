@@ -8,7 +8,7 @@ A rule in a lower context can depend on data a higher context owns. `organizatio
 
 ## Decision
 
-The lower context declares a provider interface in its own `interfaces.acl`, named `<Answer>Provider` and using only plain types (`organization.interfaces.acl.UpcomingAppointmentsProvider`). Its command service calls the interface. The higher context implements it in `application.internal.outboundservices.acl`, the only place where a context may touch another context's `interfaces.acl`, so the dependency still points from `booking` to `organization` and `ArchitectureTest` needs no new rule. Until the higher context exists, the lower context ships a `@DefaultBean` with the answer that is true without it (`NoUpcomingAppointments`: nobody has appointments before booking exists). Tests replace it with an `@Alternative` fake.
+The lower context declares a provider interface in its own `interfaces.acl`, named `<Answer>Provider` and using only plain types (`organization.interfaces.acl.UpcomingAppointmentsProvider`). Its command service calls the interface. The higher context implements it in `application.internal.outboundservices.acl`, the only place where a context may touch another context's `interfaces.acl`, so the dependency still points from `booking` to `organization` and `ArchitectureTest` needs no new rule. Until the higher context exists, the lower context ships a `@DefaultBean` with the answer that is true without it (nobody has appointments before booking exists), and the higher context's implementation (`BookingUpcomingAppointmentsProvider`) replaces it.
 
 ## Alternatives considered
 

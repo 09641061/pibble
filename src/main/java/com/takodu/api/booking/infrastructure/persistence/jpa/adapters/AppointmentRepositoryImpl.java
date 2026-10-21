@@ -19,6 +19,7 @@ import jakarta.persistence.OptimisticLockException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -62,6 +63,14 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
                                                  TimeRange window) {
         return appointmentPersistenceRepository.findByEstablishment(organizationId.value(), establishmentId.value(),
                         window.start(), window.end()).stream()
+                .map(AppointmentPersistenceAssembler::toDomainFromPersistence)
+                .toList();
+    }
+
+    @Override
+    public List<Appointment> findUpcomingByMember(OrganizationId organizationId, MemberId memberId, Instant after) {
+        return appointmentPersistenceRepository.findUpcomingByMember(organizationId.value(), memberId.value(), after)
+                .stream()
                 .map(AppointmentPersistenceAssembler::toDomainFromPersistence)
                 .toList();
     }

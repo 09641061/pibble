@@ -9,6 +9,7 @@ import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import com.takodu.api.shared.domain.model.valueobjects.TimeRange;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +31,9 @@ public interface AppointmentRepository {
     /** @return the establishment's appointments in any status that overlap the window, earliest first */
     List<Appointment> findByEstablishment(OrganizationId organizationId, EstablishmentId establishmentId,
                                           TimeRange window);
+
+    /** @return the member's confirmed appointments starting after the instant, earliest first */
+    List<Appointment> findUpcomingByMember(OrganizationId organizationId, MemberId memberId, Instant after);
 
     /**
      * @throws com.takodu.api.booking.domain.exceptions.SlotUnavailableException when an exclusion constraint rejects
