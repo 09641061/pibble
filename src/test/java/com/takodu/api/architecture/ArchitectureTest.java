@@ -2,6 +2,7 @@ package com.takodu.api.architecture;
 
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
@@ -30,6 +32,11 @@ import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.sli
 class ArchitectureTest {
 
     static final String BASE = "com.takodu.api";
+
+    /** Parameter types that scope a repository query to one organization. */
+    static final Set<String> TENANT_SCOPES = Set.of(
+            BASE + ".shared.domain.model.valueobjects.OrganizationId",
+            BASE + ".shared.domain.model.valueobjects.EstablishmentId");
 
     /** Context map: each context and the contexts it may call (facade) or listen to (events). Calls go down. */
     static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
@@ -100,6 +107,14 @@ class ArchitectureTest {
             .and().arePublic()
             .should().notBeFinal()
             .because("state is changed only through the aggregate's methods");
+
+    @ArchTest
+    static final ArchRule repository_ports_are_scoped_by_organization = methods()
+            .that().areDeclaredInClassesThat().resideInAPackage("..domain.repositories..")
+            .and().areDeclaredInClassesThat().areInterfaces()
+            .and().areDeclaredInClassesThat().areNotAnnotations()
+            .should(beScopedByOrganization())
+            .because("an id from another organization must find nothing (takodu-tenancy)");
 
     @ArchTest
     static final ArchRule controllers_are_named_controller = classes()
@@ -182,6 +197,27 @@ class ArchitectureTest {
                         events.add(SimpleConditionEvent.violated(dependency, dependency.getDescription()
                                 + " (context map: " + from + " may not depend on " + to + ")"));
                     }
+                }
+            }
+        };
+    }
+
+    /**
+     * A repository method takes an {@code OrganizationId}, an {@code EstablishmentId} or an aggregate (which
+     * carries its organization), or is marked {@code @CrossTenant} for a job or webhook.
+     */
+    private static ArchCondition<JavaMethod> beScopedByOrganization() {
+        return new ArchCondition<>("take an OrganizationId, an EstablishmentId or an aggregate, or be @CrossTenant") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                if (method.isAnnotatedWith(BASE + ".shared.domain.repositories.CrossTenant")) {
+                    return;
+                }
+                boolean scoped = method.getRawParameterTypes().stream().anyMatch(type ->
+                        TENANT_SCOPES.contains(type.getName()) || type.getPackageName().contains(".domain.model.aggregates"));
+                if (!scoped) {
+                    events.add(SimpleConditionEvent.violated(method, method.getFullName()
+                            + " is not scoped by organization; add an OrganizationId parameter or @CrossTenant"));
                 }
             }
         };
