@@ -4,6 +4,7 @@ import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
 import com.takodu.api.shared.domain.exceptions.BusinessRuleViolationException;
 import com.takodu.api.shared.domain.exceptions.ConflictException;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
+import com.takodu.api.shared.domain.exceptions.RequestInProgressException;
 import com.takodu.api.shared.domain.exceptions.ResourceNotFoundException;
 import com.takodu.api.shared.interfaces.rest.resources.ErrorResource;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,14 @@ class GlobalExceptionMapperTest {
     @Test
     void conflictMapsTo409() {
         assertEquals(409, mapper.toResponse(new ConflictException("Customer", "Phone already registered")).getStatus());
+    }
+
+    @Test
+    void requestInProgressMapsTo409WithRequestConflictCode() {
+        var response = mapper.toResponse(new RequestInProgressException());
+
+        assertEquals(409, response.getStatus());
+        assertEquals("REQUEST_CONFLICT", ((ErrorResource) response.getEntity()).code());
     }
 
     @Test
