@@ -1,0 +1,21 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "${WABA_ID}",
+    "changes": [{
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": {"display_phone_number": "15550783881", "phone_number_id": "${PHONE_NUMBER_ID}"},
+        "message_echoes": [{
+          "from": "15550783881",
+          "to": "${WA_ID}",
+          "id": "${WAMID}",
+          "timestamp": "${TIMESTAMP}",
+          "type": "text",
+          "text": {"body": "Sí, te esperamos a las 4"}
+        }]
+      },
+      "field": "smb_message_echoes"
+    }]
+  }]
+}

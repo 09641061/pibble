@@ -1,0 +1,27 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "${WABA_ID}",
+    "changes": [{
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": {"display_phone_number": "15550783881", "phone_number_id": "${PHONE_NUMBER_ID}"},
+        "history": [{
+          "metadata": {"phase": 0, "chunk_order": 1, "progress": 55},
+          "threads": [{
+            "id": "${WA_ID}",
+            "messages": [
+              {"from": "15550783881", "id": "${WAMID}.out", "timestamp": "${TIMESTAMP}", "type": "text",
+               "text": {"body": "Gracias por tu visita"}, "history_context": {"status": "READ"}},
+              {"from": "${WA_ID}", "id": "${WAMID}.in", "timestamp": "${TIMESTAMP}", "type": "text",
+               "text": {"body": "Gracias a ustedes"}, "history_context": {"status": "DELIVERED"}},
+              {"from": "15550783881", "id": "${WAMID}.media", "timestamp": "${TIMESTAMP}", "type": "media_placeholder",
+               "history_context": {"status": "PLAYED"}}
+            ]
+          }]
+        }]
+      },
+      "field": "history"
+    }]
+  }]
+}

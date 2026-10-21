@@ -30,9 +30,14 @@ public final class TestWhatsapp {
 
     public static ValidatableResponse connect(TestTenant tenant, UUID establishmentId, UUID idempotencyKey,
                                               String phoneNumberId) {
+        return connect(tenant, establishmentId, idempotencyKey, phoneNumberId, WABA_ID);
+    }
+
+    public static ValidatableResponse connect(TestTenant tenant, UUID establishmentId, UUID idempotencyKey,
+                                              String phoneNumberId, String wabaId) {
         return given().spec(tenant.spec()).header("Idempotency-Key", idempotencyKey.toString())
                 .contentType(ContentType.JSON)
-                .body(Map.of("code", "AQB-signup-code", "wabaId", WABA_ID, "phoneNumberId", phoneNumberId))
+                .body(Map.of("code", "AQB-signup-code", "wabaId", wabaId, "phoneNumberId", phoneNumberId))
                 .post("/api/v1/establishments/" + establishmentId + "/whatsapp-line")
                 .then();
     }
