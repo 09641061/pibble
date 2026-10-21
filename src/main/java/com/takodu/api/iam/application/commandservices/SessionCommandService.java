@@ -1,7 +1,9 @@
 package com.takodu.api.iam.application.commandservices;
 
 import com.takodu.api.iam.domain.exceptions.InvalidLoginCodeException;
+import com.takodu.api.iam.domain.exceptions.InvalidRefreshTokenException;
 import com.takodu.api.iam.domain.exceptions.UserDisabledException;
+import com.takodu.api.iam.domain.model.commands.RefreshSessionCommand;
 import com.takodu.api.iam.domain.model.commands.SignInCommand;
 
 public interface SessionCommandService {
@@ -16,4 +18,15 @@ public interface SessionCommandService {
      * @throws UserDisabledException when the user is disabled (I6)
      */
     SignedInSession handle(SignInCommand command);
+
+    /**
+     * Rotates the refresh token and issues a new access token for the same session (I5).
+     *
+     * @param command the refresh token the device holds
+     * @return the session with its new tokens
+     * @throws InvalidRefreshTokenException when the token is unknown, expired, revoked or reused late; a late
+     *         reuse revokes the session and is committed
+     * @throws UserDisabledException when the user is disabled (I6)
+     */
+    SignedInSession handle(RefreshSessionCommand command);
 }

@@ -4,9 +4,11 @@ import com.takodu.api.iam.application.commandservices.SessionCommandService;
 import com.takodu.api.iam.application.commandservices.SignedInSession;
 import com.takodu.api.iam.application.internal.outboundservices.tokens.AccessTokenIssuer;
 import com.takodu.api.iam.domain.exceptions.InvalidLoginCodeException;
+import com.takodu.api.iam.domain.exceptions.InvalidRefreshTokenException;
 import com.takodu.api.iam.domain.model.aggregates.LoginCode;
 import com.takodu.api.iam.domain.model.aggregates.Session;
 import com.takodu.api.iam.domain.model.aggregates.User;
+import com.takodu.api.iam.domain.model.commands.RefreshSessionCommand;
 import com.takodu.api.iam.domain.model.commands.SignInCommand;
 import com.takodu.api.iam.domain.model.valueobjects.SecretHash;
 import com.takodu.api.iam.domain.repositories.LoginCodeRepository;
@@ -60,6 +62,26 @@ public class SessionCommandServiceImpl implements SessionCommandService {
         user.signIn(now);
         codes.forEach(code -> consume(code, now));
         return openSession(userRepository.save(user), now);
+    }
+
+    /** Commits on a refused token, so a late reuse stays revoked. */
+    @Override
+    @Transactional(dontRollbackOn = InvalidRefreshTokenException.class)
+    public SignedInSession handle(RefreshSessionCommand command) {
+        var now = clock.instant();
+        var session = sessionRepository.findByRefreshTokenForUpdate(SecretHash.of(command.refreshToken()))
+                .orElseThrow(InvalidRefreshTokenException::new);
+        var refreshToken = newRefreshToken();
+        try {
+            session.refresh(SecretHash.of(command.refreshToken()), SecretHash.of(refreshToken), now);
+        } catch (InvalidRefreshTokenException e) {
+            sessionRepository.save(session);
+            throw e;
+        }
+        session = sessionRepository.save(session);
+        var user = userRepository.findById(session.getUserId()).orElseThrow(InvalidRefreshTokenException::new);
+        user.requireEnabled();
+        return new SignedInSession(user, session, refreshToken, accessTokenIssuer.issue(user.getId(), session.getId(), now));
     }
 
     private void consume(LoginCode code, Instant now) {
