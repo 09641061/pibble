@@ -1,0 +1,31 @@
+# Same evidence as the local hooks: documentation rules, then every test including ArchitectureTest.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Check commit messages
+        if: github.event_name == 'pull_request'
+        run: |
+          for sha in $(git rev-list ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}); do
+            git log -1 --format=%B "$sha" > "$RUNNER_TEMP/msg"
+            scripts/check-commit-msg.sh "$RUNNER_TEMP/msg" || { echo "in commit $sha"; exit 1; }
+          done
+      - name: Check documentation
+        run: scripts/check-docs.sh
+      - name: Test
+        run: ./mvnw -B test

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Fast local checks; the full test suite runs before push and in CI.
+set -euo pipefail
+git diff --cached --check
+if git diff --cached --name-only | grep -qE '\.md$|^\.agents/|^scripts/doc-budgets\.tsv$'; then
+  scripts/check-docs.sh
+fi

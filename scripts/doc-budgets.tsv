@@ -1,0 +1,15 @@
+# path<TAB>max words. Raise a ceiling only when the content needs it, and say why in the pull request (docs/AGENTS.md).
+AGENTS.md	600
+docs/AGENTS.md	540
+docs/architecture.md	800
+docs/decisions/README.md	350
+.agents/skills/takodu-ddd/SKILL.md	1500
+.agents/skills/takodu-feature/SKILL.md	850
+.agents/skills/takodu-fix/SKILL.md	620
+.agents/skills/takodu-context-integration/SKILL.md	1000
+.agents/skills/takodu-docs/SKILL.md	780
+.agents/skills/takodu-tenancy/SKILL.md	870
+.agents/skills/takodu-migrations/SKILL.md	880
+.agents/skills/takodu-jobs/SKILL.md	1000
+.agents/skills/takodu-whatsapp/SKILL.md	1120
+.agents/skills/takodu-assistant/SKILL.md	1150

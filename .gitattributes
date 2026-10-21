@@ -1,0 +1,3 @@
+# The repository stores LF; Windows batch scripts are checked out with CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Layer and context rules must hold before code leaves the machine.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+# Use the JDK pinned in mise.toml when mise is installed; hooks do not inherit the project's shell activation.
+if command -v mise >/dev/null 2>&1; then run=(mise exec --); else run=(); fi
+"${run[@]}" ./mvnw -B -q test -Dtest=ArchitectureTest -Dsurefire.failIfNoSpecifiedTests=false
