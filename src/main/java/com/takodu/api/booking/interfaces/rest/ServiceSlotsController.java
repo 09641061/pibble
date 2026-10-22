@@ -2,6 +2,7 @@ package com.takodu.api.booking.interfaces.rest;
 
 import com.takodu.api.booking.application.queryservices.AppointmentQueryService;
 import com.takodu.api.booking.domain.model.queries.GetAvailableSlotsQuery;
+import com.takodu.api.booking.domain.model.valueobjects.BookingSource;
 import com.takodu.api.booking.interfaces.rest.resources.SlotResource;
 import com.takodu.api.booking.interfaces.rest.transform.SlotResourceFromEntityAssembler;
 import com.takodu.api.shared.application.tenancy.TenantContext;
@@ -52,7 +53,7 @@ public class ServiceSlotsController {
         var query = new GetAvailableSlotsQuery(tenantContext.organizationId(), new ServiceId(serviceId),
                 QueryParameters.date("date", date),
                 staffMemberId == null ? null : new MemberId(staffMemberId),
-                customerId == null ? null : new CustomerId(customerId));
+                customerId == null ? null : new CustomerId(customerId), BookingSource.STAFF);
         return appointmentQueryService.handle(query).stream()
                 .map(SlotResourceFromEntityAssembler::toResourceFromEntity)
                 .toList();

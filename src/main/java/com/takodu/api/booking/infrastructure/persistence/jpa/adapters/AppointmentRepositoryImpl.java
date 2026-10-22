@@ -68,6 +68,16 @@ public class AppointmentRepositoryImpl implements AppointmentRepository {
     }
 
     @Override
+    public List<Appointment> findUpcomingByCustomer(OrganizationId organizationId, EstablishmentId establishmentId,
+                                                    CustomerId customerId, Instant after) {
+        return appointmentPersistenceRepository.findUpcomingByCustomer(organizationId.value(), establishmentId.value(),
+                        customerId.value(), after)
+                .stream()
+                .map(AppointmentPersistenceAssembler::toDomainFromPersistence)
+                .toList();
+    }
+
+    @Override
     public List<Appointment> findUpcomingByMember(OrganizationId organizationId, MemberId memberId, Instant after) {
         return appointmentPersistenceRepository.findUpcomingByMember(organizationId.value(), memberId.value(), after)
                 .stream()
