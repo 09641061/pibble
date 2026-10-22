@@ -45,7 +45,7 @@ public class ExternalConversationService {
     public boolean sendReply(OrganizationId organizationId, ConversationId conversationId, String text,
                              UUID idempotencyKey) {
         return conversationsContextFacade.sendAssistantReply(organizationId.value(), conversationId.value(), text,
-                idempotencyKey);
+                null, idempotencyKey);
     }
 
     /** A7 */

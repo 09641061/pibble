@@ -2,6 +2,7 @@ package com.takodu.api.conversations.infrastructure.persistence.jpa.assemblers;
 
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageContent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
@@ -11,6 +12,7 @@ import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 
 import java.util.List;
+import java.util.Locale;
 
 public final class MessagePersistenceAssembler {
     private MessagePersistenceAssembler() { }
@@ -22,6 +24,9 @@ public final class MessagePersistenceAssembler {
                 new MessageContent(entity.getKind(), entity.getBody(), entity.getMediaId(), entity.getMediaMime()),
                 entity.getTemplateName(),
                 entity.getTemplateParameters() == null ? List.of() : List.of(entity.getTemplateParameters()),
+                entity.getInteractiveStyle() == null ? null : new InteractiveChoices(
+                        InteractiveChoices.Style.valueOf(entity.getInteractiveStyle().toUpperCase(Locale.ROOT)),
+                        List.of(entity.getInteractiveOptions())),
                 entity.getStatus(), entity.getError(), entity.getPricingCategory(),
                 entity.getBillable(), entity.getSentByMemberId() == null ? null : new MemberId(entity.getSentByMemberId()),
                 entity.getAttempts(), entity.getNextAttemptAt(),
@@ -44,6 +49,9 @@ public final class MessagePersistenceAssembler {
         entity.setTemplateName(message.getTemplateName());
         entity.setTemplateParameters(message.getTemplateName() == null ? null
                 : message.getTemplateParameters().toArray(String[]::new));
+        var choices = message.getChoices();
+        entity.setInteractiveStyle(choices == null ? null : choices.style().name().toLowerCase(Locale.ROOT));
+        entity.setInteractiveOptions(choices == null ? null : choices.titles().toArray(String[]::new));
         entity.setStatus(message.getStatus());
         entity.setError(message.getError());
         entity.setPricingCategory(message.getPricingCategory());

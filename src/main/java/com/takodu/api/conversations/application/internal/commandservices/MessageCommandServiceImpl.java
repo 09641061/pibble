@@ -16,8 +16,10 @@ import com.takodu.api.conversations.domain.model.commands.SendNextPendingMessage
 import com.takodu.api.conversations.domain.model.commands.SendStaffMessageCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.events.OutboundMessageQueuedEvent;
+import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
 import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
+import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.conversations.domain.repositories.MessageRepository;
 import com.takodu.api.conversations.domain.repositories.WhatsappLineRepository;
@@ -101,8 +103,10 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         if (!establishment.planActive() || !lineIsConnected(conversation) || !conversation.isWindowOpen(now)
                 || conversation.isAssistantPaused(now)) return Optional.empty();
 
-        var message = messageRepository.save(Message.assistantText(conversation, command.body(), now,
-                command.idempotencyKey()));
+        var message = messageRepository.save(command.choices() == null
+                ? Message.assistantText(conversation, command.body(), now, command.idempotencyKey())
+                : Message.assistantInteractive(conversation, command.body(), command.choices(), now,
+                        command.idempotencyKey()));
         conversation.recordAssistantOutbound(now);
         conversationRepository.save(conversation);
         outboundMessageQueued.fire(new OutboundMessageQueuedEvent(message.getId()));
@@ -148,15 +152,24 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         } else {
             try {
                 var to = customer.get().whatsappId();
-                message.markSent(message.getContent().kind() == MessageKind.TEMPLATE
-                        ? whatsappGateway.sendTemplate(line, to, message.getTemplateName(), NotificationTemplate.LANGUAGE,
-                                message.getTemplateParameters())
-                        : whatsappGateway.sendText(line, to, message.getContent().body()));
+                message.markSent(deliver(message, line, to));
             } catch (WhatsappSendException e) {
                 Log.warnf("Sending message %s failed: %s", message.getId().value(), e.getMessage());
                 message.recordSendFailure(e.getMessage(), e.retryable(), command.now());
             }
         }
+    }
+
+    private Wamid deliver(Message message, WhatsappLine line, String to) {
+        var body = message.getContent().body();
+        if (message.getContent().kind() == MessageKind.TEMPLATE)
+            return whatsappGateway.sendTemplate(line, to, message.getTemplateName(), NotificationTemplate.LANGUAGE,
+                    message.getTemplateParameters());
+        if (!message.isInteractiveOut()) return whatsappGateway.sendText(line, to, body);
+        var choices = message.getChoices();
+        return choices.style() == InteractiveChoices.Style.BUTTONS
+                ? whatsappGateway.sendButtons(line, to, body, choices.titles())
+                : whatsappGateway.sendList(line, to, body, InteractiveChoices.LIST_BUTTON, choices.titles());
     }
 
     private boolean lineIsConnected(Conversation conversation) {

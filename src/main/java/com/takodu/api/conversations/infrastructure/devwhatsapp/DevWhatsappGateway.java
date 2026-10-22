@@ -23,6 +23,16 @@ public class DevWhatsappGateway implements WhatsappGateway {
     }
 
     @Override
+    public Wamid sendButtons(WhatsappLine line, String to, String body, List<String> titles) {
+        return accept(line);
+    }
+
+    @Override
+    public Wamid sendList(WhatsappLine line, String to, String body, String buttonLabel, List<String> rows) {
+        return accept(line);
+    }
+
+    @Override
     public Wamid sendTemplate(WhatsappLine line, String to, String templateName, String language,
                               List<String> parameters) {
         return accept(line);

@@ -17,6 +17,7 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.IntStream;
 
 /** Sends through {@code POST /{phone-number-id}/messages}; the token is decrypted here and nowhere else. */
 @ApplicationScoped
@@ -24,6 +25,8 @@ import java.util.Set;
 public class MetaWhatsappGateway implements WhatsappGateway {
     /** Meta's codes for throttling and temporary outages; anything else in a 4xx will fail again. */
     private static final Set<Integer> RETRYABLE_CODES = Set.of(4, 80007, 130429, 131000, 131016, 131056, 133004);
+    /** The title of a list's only section; Meta allows 24 characters. */
+    static final String LIST_SECTION = "Opciones";
 
     private final MetaGraphClient metaGraphClient;
     private final TokenCipher tokenCipher;
@@ -43,6 +46,41 @@ public class MetaWhatsappGateway implements WhatsappGateway {
     public Wamid sendText(WhatsappLine line, String to, String body) {
         return send(line, Map.of("messaging_product", "whatsapp", "recipient_type", "individual", "to", to,
                 "type", "text", "text", Map.of("preview_url", false, "body", body)));
+    }
+
+    @Override
+    public Wamid sendButtons(WhatsappLine line, String to, String body, List<String> titles) {
+        return send(line, buttons(to, body, titles));
+    }
+
+    @Override
+    public Wamid sendList(WhatsappLine line, String to, String body, String buttonLabel, List<String> rows) {
+        return send(line, list(to, body, buttonLabel, rows));
+    }
+
+    /** Ids are the 1-based positions; a tap is read by its title, so they only need to differ. */
+    static Map<String, Object> buttons(String to, String body, List<String> titles) {
+        var buttons = IntStream.range(0, titles.size())
+                .mapToObj(i -> Map.of("type", "reply",
+                        "reply", Map.of("id", "option-" + (i + 1), "title", titles.get(i))))
+                .toList();
+        return interactive(to, Map.of("type", "button", "body", Map.of("text", body),
+                "action", Map.of("buttons", buttons)));
+    }
+
+    /** One section, whose title Meta requires. */
+    static Map<String, Object> list(String to, String body, String buttonLabel, List<String> rows) {
+        var listRows = IntStream.range(0, rows.size())
+                .mapToObj(i -> Map.of("id", "option-" + (i + 1), "title", rows.get(i)))
+                .toList();
+        return interactive(to, Map.of("type", "list", "body", Map.of("text", body),
+                "action", Map.of("button", buttonLabel,
+                        "sections", List.of(Map.of("title", LIST_SECTION, "rows", listRows)))));
+    }
+
+    private static Map<String, Object> interactive(String to, Map<String, Object> interactive) {
+        return Map.of("messaging_product", "whatsapp", "recipient_type", "individual", "to", to,
+                "type", "interactive", "interactive", interactive);
     }
 
     /** Body parameters are positional text; the template's quick-reply buttons need none. */

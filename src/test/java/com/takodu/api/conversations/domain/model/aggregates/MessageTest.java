@@ -2,6 +2,7 @@ package com.takodu.api.conversations.domain.model.aggregates;
 
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
+import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageOrigin;
 import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
@@ -44,6 +45,21 @@ class MessageTest {
         assertThrows(IllegalArgumentException.class, () -> reply(" "));
         assertThrows(IllegalArgumentException.class, () -> reply("a".repeat(4097)));
         reply("a".repeat(4096));
+    }
+
+    @Test
+    void assistantChoicesHaveABodyOfAtMost1024Characters() {
+        var choices = new InteractiveChoices(InteractiveChoices.Style.BUTTONS, List.of("Sí", "No"));
+        var key = new IdempotencyKey(UUID.randomUUID());
+
+        var message = Message.assistantInteractive(conversation(), "a".repeat(1024), choices, NOW, key);
+
+        assertEquals(MessageKind.INTERACTIVE, message.getContent().kind());
+        assertEquals(choices, message.getChoices());
+        assertThrows(IllegalArgumentException.class,
+                () -> Message.assistantInteractive(conversation(), "a".repeat(1025), choices, NOW, key));
+        assertThrows(IllegalArgumentException.class,
+                () -> Message.assistantInteractive(conversation(), " ", choices, NOW, key));
     }
 
     @Test

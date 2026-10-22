@@ -12,10 +12,12 @@ public final class MessageResourceFromEntityAssembler {
 
     public static MessageResource toResourceFromEntity(Message message) {
         var content = message.getContent();
+        var choices = message.getChoices();
         return new MessageResource(message.getId().value(), message.getConversationId().value(),
                 lower(message.getDirection()), lower(message.getOrigin()), lower(content.kind()), content.body(),
                 content.mediaId() != null, content.mediaMime(), message.getTemplateName(), lower(message.getStatus()),
                 message.getError(), message.getSentBy() == null ? null : message.getSentBy().value(),
+                choices == null ? null : lower(choices.style()), choices == null ? List.of() : choices.titles(),
                 message.getOccurredAt());
     }
 

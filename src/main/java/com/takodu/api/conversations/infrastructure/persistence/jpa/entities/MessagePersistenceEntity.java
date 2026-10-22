@@ -63,6 +63,13 @@ public class MessagePersistenceEntity extends AuditableAbstractPersistenceEntity
     @Column(name = "template_parameters", updatable = false)
     private String[] templateParameters;
 
+    @Column(name = "interactive_style", updatable = false)
+    private String interactiveStyle;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "interactive_options", updatable = false)
+    private String[] interactiveOptions;
+
     @Convert(converter = DeliveryStatusPersistenceConverter.class)
     @Column(name = "status", nullable = false)
     private DeliveryStatus status;
