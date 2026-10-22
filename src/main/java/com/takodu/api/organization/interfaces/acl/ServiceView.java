@@ -9,6 +9,8 @@ import java.util.UUID;
  * @param priceCents price in the smallest unit of {@code currency}
  * @param performerIds active, bookable members working at the establishment, in the team's order: the order they
  *        joined
+ * @param instructions what the customer should know before coming, such as {@code Venir sin maquillaje}; null when
+ *        none
  */
 public record ServiceView(UUID id, UUID establishmentId, String name, int durationMinutes, long priceCents,
-                          String currency, boolean active, List<UUID> performerIds) { }
+                          String currency, boolean active, List<UUID> performerIds, String instructions) { }

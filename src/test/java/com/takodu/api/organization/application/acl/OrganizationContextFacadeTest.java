@@ -2,10 +2,12 @@ package com.takodu.api.organization.application.acl;
 
 import com.takodu.api.organization.interfaces.acl.OpeningRangeView;
 import com.takodu.api.organization.interfaces.acl.OrganizationContextFacade;
+import com.takodu.api.organization.interfaces.acl.ServiceView;
 import com.takodu.api.shared.infrastructure.time.TestClock;
 import com.takodu.api.shared.testing.TestSalon;
 import com.takodu.api.shared.testing.TestTenants;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
@@ -102,6 +105,32 @@ class OrganizationContextFacadeTest {
                 .orElseThrow().worksThere());
         assertTrue(organizationContextFacade.fetchMember(owner.organizationId(), owner.memberId(), UUID.fromString(second))
                 .orElseThrow().worksThere());
+    }
+
+    @Test
+    void activeServicesComeByNameWithTheirInstructions() {
+        var salon = TestSalon.open();
+        var organizationId = salon.owner().organizationId();
+        given().spec(salon.owner().spec()).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(ContentType.JSON)
+                .body(Map.of("name", "Barba", "durationMinutes", 30, "priceCents", 2000,
+                        "instructions", "Llega 5 minutos antes", "performerIds", List.of(salon.owner().memberId())))
+                .post("/api/v1/establishments/" + salon.establishmentId() + "/services").then().statusCode(201);
+        String inactive = given().spec(salon.owner().spec()).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(ContentType.JSON)
+                .body(Map.of("name", "Tinte", "durationMinutes", 90, "priceCents", 9000, "performerIds", List.of()))
+                .post("/api/v1/establishments/" + salon.establishmentId() + "/services")
+                .then().statusCode(201).extract().path("id");
+        given().spec(salon.owner().spec()).header("Idempotency-Key", UUID.randomUUID().toString())
+                .post("/api/v1/services/" + inactive + "/deactivations").then().statusCode(200);
+
+        var services = organizationContextFacade.fetchActiveServices(organizationId, salon.establishmentId());
+
+        assertEquals(List.of("Barba", "Corte"), services.stream().map(ServiceView::name).toList());
+        assertEquals("Llega 5 minutos antes", services.getFirst().instructions());
+        assertEquals(List.of(salon.owner().memberId()), services.getFirst().performerIds());
+        assertTrue(organizationContextFacade.fetchActiveServices(TestTenants.owner().organizationId(),
+                salon.establishmentId()).isEmpty());
     }
 
     @Test
