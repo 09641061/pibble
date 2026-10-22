@@ -116,7 +116,8 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
         var saved = appointmentRepository.save(appointment);
         appointmentRescheduled.fire(new AppointmentRescheduledIntegrationEvent(command.organizationId().value(),
                 saved.getId().value(), saved.getEstablishmentId().value(), saved.getCustomerId().value(),
-                saved.getStaffMemberId().value(), saved.getRange().start(), saved.getRange().end()));
+                saved.getStaffMemberId().value(), saved.getServiceId().value(), saved.getRange().start(),
+                saved.getRange().end()));
         return saved;
     }
 
@@ -129,7 +130,7 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
         var saved = appointmentRepository.save(appointment);
         appointmentCancelled.fire(new AppointmentCancelledIntegrationEvent(command.organizationId().value(),
                 saved.getId().value(), saved.getEstablishmentId().value(), saved.getCustomerId().value(),
-                saved.getRange().start(), saved.getCancelledBy().name().toLowerCase(Locale.ROOT),
+                saved.getServiceId().value(), saved.getRange().start(), saved.getCancelledBy().name().toLowerCase(Locale.ROOT),
                 saved.getCancelReason().value()));
         return saved;
     }

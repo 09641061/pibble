@@ -76,7 +76,8 @@ public class OrganizationContextFacadeImpl implements OrganizationContextFacade 
         var openingHours = establishment.getSchedule().ranges().stream()
                 .map(range -> new OpeningRangeView(range.day().getValue(), range.opensAt(), range.closesAt()))
                 .toList();
-        return new EstablishmentCalendarView(establishment.getId().value(), establishment.getTimeZone().value().getId(),
+        return new EstablishmentCalendarView(establishment.getId().value(), establishment.getName(),
+                establishment.getTimeZone().value().getId(),
                 openingHours, !establishment.isActive(), planActive);
     }
 }
