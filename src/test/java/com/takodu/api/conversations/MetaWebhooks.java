@@ -33,12 +33,14 @@ public final class MetaWebhooks {
     }
 
     /**
-     * @param values the placeholders without {@code ${}}; {@code WABA_ID} and {@code TIMESTAMP} (now) have defaults
+     * @param values the placeholders without {@code ${}}; {@code WABA_ID}, {@code TIMESTAMP} (now) and {@code BODY}
+     *        (a customer asking for an appointment) have defaults
      */
     public static String payload(String name, Map<String, String> values) {
         var all = new HashMap<String, String>();
         all.put("WABA_ID", TestWhatsapp.WABA_ID);
         all.put("TIMESTAMP", String.valueOf(Instant.now().getEpochSecond()));
+        all.put("BODY", "Hola, ¿tienen cita mañana a las 4?");
         all.putAll(values);
         var json = read(name);
         for (var value : all.entrySet()) json = json.replace("${" + value.getKey() + "}", value.getValue());

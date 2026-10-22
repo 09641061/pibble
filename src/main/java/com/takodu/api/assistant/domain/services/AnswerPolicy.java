@@ -8,6 +8,9 @@ import java.util.Optional;
 
 /** A2: whether the assistant may answer a chat now. Checked when a message arrives and again before answering. */
 public final class AnswerPolicy {
+    /** 08 §7: a chat gets at most this many answered turns in 24 hours; then a person takes over. */
+    public static final int MAX_TURNS_PER_DAY = 30;
+
     private AnswerPolicy() { }
 
     /**

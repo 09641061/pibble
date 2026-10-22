@@ -137,6 +137,19 @@ public class AssistantTurn {
     }
 
     /**
+     * The reply was dropped because the assistant may no longer answer, such as a person writing meanwhile (A3);
+     * what the attempt cost is still recorded (A9).
+     */
+    public void drop(String reason, TurnUsage usage, int toolCalls, Instant now) {
+        if (status != TurnStatus.RUNNING) throw new IllegalStateException("Only a running turn is dropped");
+        this.usage = usage;
+        this.toolCalls = toolCalls;
+        this.status = TurnStatus.SKIPPED;
+        this.error = Objects.requireNonNull(reason, "reason is required");
+        this.finishedAt = now;
+    }
+
+    /**
      * A model or tool infrastructure error: tried again later, until the third attempt fails it for good (A7).
      *
      * @param usage what the failed attempt cost so far; null when unknown

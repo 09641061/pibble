@@ -12,7 +12,7 @@
           "id": "${WAMID}",
           "timestamp": "${TIMESTAMP}",
           "type": "text",
-          "text": {"body": "Hola, ¿tienen cita mañana a las 4?"}
+          "text": {"body": "${BODY}"}
         }]
       },
       "field": "messages"
