@@ -1,0 +1,29 @@
+package com.takodu.api.assistant.application.internal.outboundservices.acl;
+
+import com.takodu.api.assistant.domain.model.valueobjects.ConversationId;
+import com.takodu.api.assistant.domain.model.valueobjects.ConversationState;
+import com.takodu.api.conversations.interfaces.acl.ConversationsContextFacade;
+import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
+import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
+import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.Optional;
+
+/** The only class in assistant that talks to conversations. */
+@ApplicationScoped
+public class ExternalConversationService {
+    private final ConversationsContextFacade conversationsContextFacade;
+
+    public ExternalConversationService(ConversationsContextFacade conversationsContextFacade) {
+        this.conversationsContextFacade = conversationsContextFacade;
+    }
+
+    /** @return the chat's state for A2, empty when it is not in the organization */
+    public Optional<ConversationState> fetchConversation(OrganizationId organizationId, ConversationId conversationId) {
+        return conversationsContextFacade.fetchConversation(organizationId.value(), conversationId.value())
+                .map(view -> new ConversationState(new ConversationId(view.conversationId()),
+                        new EstablishmentId(view.establishmentId()), new CustomerId(view.customerId()),
+                        view.lineConnected(), view.windowOpen(), view.assistantPaused()));
+    }
+}
