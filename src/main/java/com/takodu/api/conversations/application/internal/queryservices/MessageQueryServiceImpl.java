@@ -4,6 +4,7 @@ import com.takodu.api.conversations.application.queryservices.MessageQueryServic
 import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundException;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.queries.GetMessagesByConversationQuery;
+import com.takodu.api.conversations.domain.model.queries.GetRecentMessagesQuery;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.conversations.domain.repositories.MessageRepository;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
@@ -33,5 +34,11 @@ public class MessageQueryServiceImpl implements MessageQueryService {
         accessPolicy.requireEstablishment(conversation.getEstablishmentId());
         return messageRepository.findByConversation(query.organizationId(), query.conversationId(), query.before(),
                 query.size());
+    }
+
+    @Override
+    public List<Message> handle(GetRecentMessagesQuery query) {
+        return messageRepository.findByConversation(query.organizationId(), query.conversationId(), null,
+                query.limit()).reversed();
     }
 }

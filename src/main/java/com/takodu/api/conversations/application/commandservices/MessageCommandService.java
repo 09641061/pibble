@@ -4,10 +4,13 @@ import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundExcept
 import com.takodu.api.conversations.domain.exceptions.LineDisconnectedException;
 import com.takodu.api.conversations.domain.exceptions.WindowClosedException;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
+import com.takodu.api.conversations.domain.model.commands.SendAssistantReplyCommand;
 import com.takodu.api.conversations.domain.model.commands.SendNextPendingMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.SendStaffMessageCommand;
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
+
+import java.util.Optional;
 
 public interface MessageCommandService {
 
@@ -23,6 +26,16 @@ public interface MessageCommandService {
      * @throws WindowClosedException when the customer last wrote more than 24 hours ago (W6)
      */
     Message handle(SendStaffMessageCommand command);
+
+    /**
+     * A2, A8: queues the assistant's reply in the outbox. It is dropped when the assistant may no longer answer: a
+     * person wrote meanwhile or it was handed off (A3, A7), the window closed (W6), the line disconnected (W15) or the
+     * plan lapsed (O6). Runs without a caller, for the assistant's turn.
+     *
+     * @return the pending message, or the one an earlier turn attempt queued; empty when dropped
+     * @throws ConversationNotFoundException when the conversation is not in the organization
+     */
+    Optional<Message> handle(SendAssistantReplyCommand command);
 
     /**
      * W14, W15: sends the oldest due outbound message, re-checking the rules that allowed it, and records the result

@@ -1,6 +1,7 @@
 package com.takodu.api.conversations.application.queryservices;
 
 import com.takodu.api.conversations.domain.model.queries.GetConversationByIdQuery;
+import com.takodu.api.conversations.domain.model.queries.GetConversationForAssistantQuery;
 import com.takodu.api.conversations.domain.model.queries.GetConversationsByEstablishmentQuery;
 
 import java.util.List;
@@ -23,4 +24,7 @@ public interface ConversationQueryService {
      *         establishment
      */
     Optional<InboxConversation> handle(GetConversationByIdQuery query);
+
+    /** @return empty when the conversation is not in the organization */
+    Optional<AssistantConversation> handle(GetConversationForAssistantQuery query);
 }

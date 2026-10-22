@@ -11,6 +11,7 @@ import com.takodu.api.conversations.domain.exceptions.WindowClosedException;
 import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
+import com.takodu.api.conversations.domain.model.commands.SendAssistantReplyCommand;
 import com.takodu.api.conversations.domain.model.commands.SendNextPendingMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.SendStaffMessageCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
@@ -29,6 +30,7 @@ import jakarta.enterprise.event.Event;
 import jakarta.transaction.Transactional;
 
 import java.time.Clock;
+import java.util.Optional;
 
 @ApplicationScoped
 public class MessageCommandServiceImpl implements MessageCommandService {
@@ -84,6 +86,28 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         outboundMessageQueued.fire(new OutboundMessageQueuedEvent(message.getId()));
         conversationChanged.fire(changed(conversation));
         return message;
+    }
+
+    @Override
+    @Transactional
+    public Optional<Message> handle(SendAssistantReplyCommand command) {
+        var earlier = messageRepository.findByIdempotencyKey(command.organizationId(), command.idempotencyKey());
+        if (earlier.isPresent()) return earlier;
+        var conversation = conversationRepository.lockById(command.organizationId(), command.conversationId())
+                .orElseThrow(() -> new ConversationNotFoundException(command.conversationId()));
+        var now = clock.instant();
+        var establishment = externalOrganizationService.fetchEstablishment(command.organizationId(),
+                conversation.getEstablishmentId());
+        if (!establishment.planActive() || !lineIsConnected(conversation) || !conversation.isWindowOpen(now)
+                || conversation.isAssistantPaused(now)) return Optional.empty();
+
+        var message = messageRepository.save(Message.assistantText(conversation, command.body(), now,
+                command.idempotencyKey()));
+        conversation.recordAssistantOutbound(now);
+        conversationRepository.save(conversation);
+        outboundMessageQueued.fire(new OutboundMessageQueuedEvent(message.getId()));
+        conversationChanged.fire(changed(conversation));
+        return Optional.of(message);
     }
 
     /** One row per transaction: the row stays locked while Meta answers, so no other sender takes it (takodu-jobs). */

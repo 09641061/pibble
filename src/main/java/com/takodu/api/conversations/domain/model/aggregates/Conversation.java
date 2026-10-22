@@ -22,6 +22,8 @@ public class Conversation {
     public static final Duration SERVICE_WINDOW = Duration.ofHours(24);
     /** A3: the assistant stays quiet for 12 hours after a person writes, sliding with each human message. */
     public static final Duration HUMAN_PAUSE = Duration.ofHours(12);
+    /** What the inbox shows of a handoff's reason. */
+    public static final int MAX_HANDOFF_SUMMARY = 500;
 
     private final ConversationId id;
     private final OrganizationId organizationId;
@@ -33,17 +35,20 @@ public class Conversation {
     private Instant lastInboundAt;
     private Instant lastMessageAt;
     private int unreadCount;
+    private Instant assistantHandedOffAt;
+    private String handoffSummary;
 
     /** @param firstMessageAt when the message that starts the conversation was sent */
     public static Conversation start(WhatsappLine line, CustomerId customerId, Instant firstMessageAt) {
         return new Conversation(null, line.getOrganizationId(), line.getEstablishmentId(), line.getId(), customerId,
-                null, null, null, firstMessageAt, 0);
+                null, null, null, firstMessageAt, 0, null, null);
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
     public Conversation(ConversationId id, OrganizationId organizationId, EstablishmentId establishmentId,
                         WhatsappLineId lineId, CustomerId customerId, MemberId assignedMemberId,
-                        Instant assistantPausedUntil, Instant lastInboundAt, Instant lastMessageAt, int unreadCount) {
+                        Instant assistantPausedUntil, Instant lastInboundAt, Instant lastMessageAt, int unreadCount,
+                        Instant assistantHandedOffAt, String handoffSummary) {
         this.id = id;
         this.organizationId = Objects.requireNonNull(organizationId, "organizationId is required");
         this.establishmentId = Objects.requireNonNull(establishmentId, "establishmentId is required");
@@ -54,6 +59,8 @@ public class Conversation {
         this.lastInboundAt = lastInboundAt;
         this.lastMessageAt = Objects.requireNonNull(lastMessageAt, "lastMessageAt is required");
         this.unreadCount = unreadCount;
+        this.assistantHandedOffAt = assistantHandedOffAt;
+        this.handoffSummary = handoffSummary;
     }
 
     /** W6, W8: the customer wrote; the window reopens and staff have one more message to read. */
@@ -84,6 +91,30 @@ public class Conversation {
         touch(at);
     }
 
+    /** The assistant replied; it orders the inbox and leaves the customer's messages unread for staff. */
+    public void recordAssistantOutbound(Instant at) {
+        touch(at);
+    }
+
+    /**
+     * A7: the assistant hands the chat to a person. It stays quiet until staff resume it, and the chat shows unread
+     * with the reason, so someone looks.
+     *
+     * @param summary what the customer needs, in the assistant's words
+     */
+    public void handOff(String summary, Instant now) {
+        if (summary == null || summary.isBlank()) throw new IllegalArgumentException("A handoff needs a summary");
+        if (assistantHandedOffAt == null) assistantHandedOffAt = now;
+        handoffSummary = summary.strip().length() > MAX_HANDOFF_SUMMARY
+                ? summary.strip().substring(0, MAX_HANDOFF_SUMMARY) : summary.strip();
+        unreadCount = Math.max(unreadCount, 1);
+    }
+
+    /** @return whether the assistant handed the chat to a person who has not resumed it yet */
+    public boolean isHandedOff() {
+        return assistantHandedOffAt != null;
+    }
+
     /** W6: the single source of truth for whether free-form messages may be sent. */
     public boolean isWindowOpen(Instant now) {
         return lastInboundAt != null && now.isBefore(windowClosesAt());
@@ -94,8 +125,9 @@ public class Conversation {
         return lastInboundAt == null ? null : lastInboundAt.plus(SERVICE_WINDOW);
     }
 
+    /** A3, A7: a person wrote less than 12 hours ago, or the assistant handed the chat off. */
     public boolean isAssistantPaused(Instant now) {
-        return assistantPausedUntil != null && now.isBefore(assistantPausedUntil);
+        return isHandedOff() || assistantPausedUntil != null && now.isBefore(assistantPausedUntil);
     }
 
     /** W8 */

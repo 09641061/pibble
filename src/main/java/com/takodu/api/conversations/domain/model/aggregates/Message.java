@@ -74,6 +74,21 @@ public class Message {
     }
 
     /**
+     * A8: the assistant's reply, queued for the sender job like a staff reply.
+     *
+     * @param idempotencyKey derived from the turn, so a retried turn queues it once
+     * @throws IllegalArgumentException when the text is blank or longer than 4,096 characters
+     */
+    public static Message assistantText(Conversation conversation, String body, Instant now,
+                                        IdempotencyKey idempotencyKey) {
+        if (body == null || body.isBlank()) throw new IllegalArgumentException("The assistant's reply is empty");
+        if (body.length() > MAX_TEXT) throw new IllegalArgumentException("A message has at most 4096 characters");
+        return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
+                MessageOrigin.ASSISTANT, null, MessageContent.text(body), null, List.of(), DeliveryStatus.PENDING, null,
+                null, null, null, 0, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"), now);
+    }
+
+    /**
      * W11-W13: an appointment notification, queued for the sender job. Outside the window it goes as the approved
      * template; inside, as the same text. Either way the inbox shows the text the customer reads.
      *

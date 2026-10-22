@@ -5,6 +5,7 @@ import com.takodu.api.conversations.application.internal.outboundservices.acl.Ex
 import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundException;
 import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.commands.AssignConversationCommand;
+import com.takodu.api.conversations.domain.model.commands.HandOffConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
@@ -16,20 +17,25 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.transaction.Transactional;
 
+import java.time.Clock;
+
 @ApplicationScoped
 public class ConversationCommandServiceImpl implements ConversationCommandService {
     private final ConversationRepository conversationRepository;
     private final ExternalOrganizationService externalOrganizationService;
     private final AccessPolicy accessPolicy;
     private final Event<ConversationChangedEvent> conversationChanged;
+    private final Clock clock;
 
     public ConversationCommandServiceImpl(ConversationRepository conversationRepository,
                                           ExternalOrganizationService externalOrganizationService,
-                                          AccessPolicy accessPolicy, Event<ConversationChangedEvent> conversationChanged) {
+                                          AccessPolicy accessPolicy, Event<ConversationChangedEvent> conversationChanged,
+                                          Clock clock) {
         this.conversationRepository = conversationRepository;
         this.externalOrganizationService = externalOrganizationService;
         this.accessPolicy = accessPolicy;
         this.conversationChanged = conversationChanged;
+        this.clock = clock;
     }
 
     @Override
@@ -48,6 +54,15 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
             externalOrganizationService.requireMemberWorksAt(command.organizationId(), command.memberId(),
                     conversation.getEstablishmentId());
         conversation.assignTo(command.memberId());
+        return save(conversation);
+    }
+
+    @Override
+    @Transactional
+    public Conversation handle(HandOffConversationCommand command) {
+        var conversation = conversationRepository.lockById(command.organizationId(), command.conversationId())
+                .orElseThrow(() -> new ConversationNotFoundException(command.conversationId()));
+        conversation.handOff(command.summary(), clock.instant());
         return save(conversation);
     }
 

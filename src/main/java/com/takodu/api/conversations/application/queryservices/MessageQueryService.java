@@ -2,6 +2,7 @@ package com.takodu.api.conversations.application.queryservices;
 
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.queries.GetMessagesByConversationQuery;
+import com.takodu.api.conversations.domain.model.queries.GetRecentMessagesQuery;
 
 import java.util.List;
 
@@ -15,4 +16,7 @@ public interface MessageQueryService {
      *         establishment
      */
     List<Message> handle(GetMessagesByConversationQuery query);
+
+    /** @return the last messages, oldest first; empty when the conversation is not in the organization */
+    List<Message> handle(GetRecentMessagesQuery query);
 }

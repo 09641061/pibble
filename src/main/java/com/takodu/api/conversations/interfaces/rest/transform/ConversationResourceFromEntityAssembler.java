@@ -18,7 +18,7 @@ public final class ConversationResourceFromEntityAssembler {
                 conversation.getAssignedMemberId() == null ? null : conversation.getAssignedMemberId().value(),
                 conversation.getUnreadCount(), conversation.getLastMessageAt(), conversation.getLastInboundAt(),
                 entry.windowOpen(), conversation.windowClosesAt(), entry.assistantPaused(),
-                conversation.getAssistantPausedUntil());
+                conversation.getAssistantPausedUntil(), conversation.isHandedOff(), conversation.getHandoffSummary());
     }
 
     /** @param size the page size asked for; a full page may have more after it */
