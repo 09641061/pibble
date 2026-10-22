@@ -1,5 +1,6 @@
 package com.takodu.api.booking.application.commandservices;
 
+import com.takodu.api.booking.domain.exceptions.CustomerChangeTooLateException;
 import com.takodu.api.booking.domain.exceptions.AppointmentChangedException;
 import com.takodu.api.booking.domain.exceptions.AppointmentNotFoundException;
 import com.takodu.api.booking.domain.exceptions.CustomerNotFoundException;
@@ -56,6 +57,7 @@ public interface AppointmentCommandService {
      * @throws OutsideOpeningHoursException B3
      * @throws TimeBlockedException B4
      * @throws SlotUnavailableException B5, B6
+     * @throws CustomerChangeTooLateException B14, for the assistant
      */
     Appointment handle(RescheduleAppointmentCommand command);
 
@@ -63,6 +65,7 @@ public interface AppointmentCommandService {
      * B12: works while the plan is inactive, and publishes {@code AppointmentCancelledIntegrationEvent}.
      *
      * @throws InvalidAppointmentTransitionException when the appointment is already final (B10)
+     * @throws CustomerChangeTooLateException B14, for the assistant
      */
     Appointment handle(CancelAppointmentCommand command);
 

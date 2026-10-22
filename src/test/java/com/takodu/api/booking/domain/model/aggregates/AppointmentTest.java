@@ -141,6 +141,22 @@ class AppointmentTest {
         assertFalse(appointment.alreadyApplied(key()));
     }
 
+    @Test
+    void customerMayChangeUntilTwoHoursBeforeTheStart() {
+        var appointment = book();
+
+        assertTrue(appointment.customerMayChange(TEN.minus(Duration.ofHours(2))));
+        assertFalse(appointment.customerMayChange(TEN.minus(Duration.ofHours(2)).plusSeconds(1)));
+    }
+
+    @Test
+    void customerMayNotChangeAnAppointmentThatStarted() {
+        var appointment = book();
+        appointment.changeStatus(AppointmentStatus.IN_PROGRESS, TEN.minus(Duration.ofDays(1)), key());
+
+        assertFalse(appointment.customerMayChange(TEN.minus(Duration.ofDays(1))));
+    }
+
     private Appointment book() {
         var booked = Appointment.book(new OrganizationId(UUID.randomUUID()), new CustomerId(UUID.randomUUID()), haircut,
                 ana, TEN, BookingSource.STAFF, new UserId(UUID.randomUUID()), key());
