@@ -5,7 +5,7 @@ description: How the customer-facing AI booking assistant of the pibble backend 
 
 # The assistant in pibble
 
-The assistant answers customers on the establishment's WhatsApp line and books into the real calendar. It is a booking assistant for one business, not a general chatbot. The decision is [customer-facing assistant with in-process tools](../../../docs/decisions/proposed/2026-10-19-assistant-with-in-process-tools.md); the product design is `../docs/08-ai-assistant.md`; rules A1–A9 and B9, B14 are in `../docs/03-business-domain.md`. Package names are relative to `com.takodu.api.assistant`.
+The assistant answers customers on the establishment's WhatsApp line and books into the real calendar. It is a booking assistant for one business, not a general chatbot. The decision is [customer-facing assistant with in-process tools](../../../docs/decisions/implemented/2026-10-19-assistant-with-in-process-tools.md); the product design is `../docs/08-ai-assistant.md`; rules A1–A9 and B9, B14 are in `../docs/03-business-domain.md`. Package names are relative to `com.takodu.api.assistant`.
 
 ## Rules that do not bend
 
