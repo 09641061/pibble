@@ -2,6 +2,9 @@ package com.takodu.api.conversations.domain.model.aggregates;
 
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageOrigin;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
 import com.takodu.api.conversations.domain.model.valueobjects.WhatsappLineId;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -72,11 +76,31 @@ class MessageTest {
         assertEquals("131047: Re-engagement message", message.getError());
     }
 
+    @Test
+    void notificationKeepsTheTextTheCustomerReadsEitherWay() {
+        var parameters = List.of("Ana", "Corte", "Sede Miraflores", "sábado 24 de octubre", "10:00");
+
+        var template = Message.notification(conversation(), NotificationTemplate.REMINDER, parameters, true, NOW);
+        var text = Message.notification(conversation(), NotificationTemplate.REMINDER, parameters, false, NOW);
+
+        assertEquals(MessageKind.TEMPLATE, template.getContent().kind());
+        assertEquals("takodu_reminder", template.getTemplateName());
+        assertEquals(parameters, template.getTemplateParameters());
+        assertEquals(MessageOrigin.SYSTEM, template.getOrigin());
+        assertEquals(MessageKind.TEXT, text.getContent().kind());
+        assertNull(text.getTemplateName());
+        assertEquals(template.getContent().body(), text.getContent().body());
+        assertEquals(DeliveryStatus.PENDING, text.getStatus());
+    }
+
     private static Message reply(String body) {
-        var conversation = new Conversation(new ConversationId(UUID.randomUUID()), new OrganizationId(UUID.randomUUID()),
+        return Message.staffText(conversation(), new MemberId(UUID.randomUUID()), body, NOW,
+                new IdempotencyKey(UUID.randomUUID()));
+    }
+
+    private static Conversation conversation() {
+        return new Conversation(new ConversationId(UUID.randomUUID()), new OrganizationId(UUID.randomUUID()),
                 new EstablishmentId(UUID.randomUUID()), new WhatsappLineId(UUID.randomUUID()),
                 new CustomerId(UUID.randomUUID()), null, null, NOW, NOW, 1);
-        return Message.staffText(conversation, new MemberId(UUID.randomUUID()), body, NOW,
-                new IdempotencyKey(UUID.randomUUID()));
     }
 }

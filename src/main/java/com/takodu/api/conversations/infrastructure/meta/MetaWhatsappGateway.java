@@ -14,6 +14,7 @@ import jakarta.ws.rs.WebApplicationException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -40,8 +41,22 @@ public class MetaWhatsappGateway implements WhatsappGateway {
 
     @Override
     public Wamid sendText(WhatsappLine line, String to, String body) {
-        var payload = Map.of("messaging_product", "whatsapp", "recipient_type", "individual", "to", to,
-                "type", "text", "text", Map.of("preview_url", false, "body", body));
+        return send(line, Map.of("messaging_product", "whatsapp", "recipient_type", "individual", "to", to,
+                "type", "text", "text", Map.of("preview_url", false, "body", body)));
+    }
+
+    /** Body parameters are positional text; the template's quick-reply buttons need none. */
+    @Override
+    public Wamid sendTemplate(WhatsappLine line, String to, String templateName, String language,
+                              List<String> parameters) {
+        var body = Map.of("type", "body", "parameters", parameters.stream()
+                .map(text -> Map.of("type", "text", "text", text)).toList());
+        return send(line, Map.of("messaging_product", "whatsapp", "recipient_type", "individual", "to", to,
+                "type", "template", "template", Map.of("name", templateName, "language", Map.of("code", language),
+                        "components", List.of(body))));
+    }
+
+    private Wamid send(WhatsappLine line, Map<String, Object> payload) {
         try {
             var response = metaGraphClient.sendMessage(version, line.getPhoneNumberId(),
                     "Bearer " + tokenCipher.decrypt(line.getAccessToken().value()), payload);

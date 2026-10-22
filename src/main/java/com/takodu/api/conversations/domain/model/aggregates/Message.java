@@ -5,7 +5,9 @@ import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageContent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageDirection;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageOrigin;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
@@ -14,6 +16,7 @@ import lombok.Getter;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -33,6 +36,7 @@ public class Message {
     private Wamid wamid;
     private final MessageContent content;
     private final String templateName;
+    private final List<String> templateParameters;
     private DeliveryStatus status;
     private String error;
     private String pricingCategory;
@@ -47,7 +51,7 @@ public class Message {
     public static Message inbound(Conversation conversation, Wamid wamid, MessageContent content, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.IN,
                 MessageOrigin.CUSTOMER, Objects.requireNonNull(wamid, "wamid is required"), content, null,
-                DeliveryStatus.RECEIVED, null, null, null, null, 0, null, null, at);
+                List.of(), DeliveryStatus.RECEIVED, null, null, null, null, 0, null, null, at);
     }
 
     /** WhatsApp's limit for a text message. */
@@ -65,15 +69,31 @@ public class Message {
         if (body == null || body.isBlank()) throw new IllegalArgumentException("Write a message");
         if (body.length() > MAX_TEXT) throw new IllegalArgumentException("A message has at most 4096 characters");
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
-                MessageOrigin.STAFF, null, MessageContent.text(body), null, DeliveryStatus.PENDING, null, null, null,
-                Objects.requireNonNull(sentBy, "Staff messages record who sent them"), 0, now, idempotencyKey, now);
+                MessageOrigin.STAFF, null, MessageContent.text(body), null, List.of(), DeliveryStatus.PENDING, null,
+                null, null, Objects.requireNonNull(sentBy, "Staff messages record who sent them"), 0, now, idempotencyKey, now);
+    }
+
+    /**
+     * W11-W13: an appointment notification, queued for the sender job. Outside the window it goes as the approved
+     * template; inside, as the same text. Either way the inbox shows the text the customer reads.
+     *
+     * @param asTemplate whether it must go as the template: always for reminders, and whenever the window is closed
+     */
+    public static Message notification(Conversation conversation, NotificationTemplate template,
+                                       List<String> parameters, boolean asTemplate, Instant now) {
+        var body = template.render(parameters);
+        return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
+                MessageOrigin.SYSTEM, null, new MessageContent(asTemplate ? MessageKind.TEMPLATE : MessageKind.TEXT,
+                body, null, null), asTemplate ? template.metaName() : null,
+                asTemplate ? template.parameters(parameters) : List.of(), DeliveryStatus.PENDING, null, null, null,
+                null, 0, now, null, now);
     }
 
     /** W5: the owner replied from the WhatsApp Business app; WhatsApp already sent it. */
     public static Message businessAppEcho(Conversation conversation, Wamid wamid, MessageContent content, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
                 MessageOrigin.BUSINESS_APP, Objects.requireNonNull(wamid, "wamid is required"), content, null,
-                DeliveryStatus.SENT, null, null, null, null, 0, null, null, at);
+                List.of(), DeliveryStatus.SENT, null, null, null, null, 0, null, null, at);
     }
 
     /**
@@ -85,16 +105,16 @@ public class Message {
                                   boolean fromCustomer, DeliveryStatus status, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(),
                 fromCustomer ? MessageDirection.IN : MessageDirection.OUT, MessageOrigin.HISTORY,
-                Objects.requireNonNull(wamid, "wamid is required"), content, null,
+                Objects.requireNonNull(wamid, "wamid is required"), content, null, List.of(),
                 fromCustomer ? DeliveryStatus.RECEIVED : status, null, null, null, null, 0, null, null, at);
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
     public Message(MessageId id, OrganizationId organizationId, ConversationId conversationId,
                    MessageDirection direction, MessageOrigin origin, Wamid wamid, MessageContent content,
-                   String templateName, DeliveryStatus status, String error, String pricingCategory, Boolean billable,
-                   MemberId sentBy, int attempts, Instant nextAttemptAt, IdempotencyKey idempotencyKey,
-                   Instant occurredAt) {
+                   String templateName, List<String> templateParameters, DeliveryStatus status, String error,
+                   String pricingCategory, Boolean billable, MemberId sentBy, int attempts, Instant nextAttemptAt,
+                   IdempotencyKey idempotencyKey, Instant occurredAt) {
         this.id = id;
         this.organizationId = Objects.requireNonNull(organizationId, "organizationId is required");
         this.conversationId = Objects.requireNonNull(conversationId, "conversationId is required");
@@ -103,6 +123,7 @@ public class Message {
         this.wamid = wamid;
         this.content = Objects.requireNonNull(content, "content is required");
         this.templateName = templateName;
+        this.templateParameters = List.copyOf(templateParameters);
         this.status = Objects.requireNonNull(status, "status is required");
         this.error = error;
         this.pricingCategory = pricingCategory;

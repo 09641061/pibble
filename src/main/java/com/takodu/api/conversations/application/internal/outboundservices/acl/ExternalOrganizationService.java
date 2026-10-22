@@ -5,10 +5,15 @@ import com.takodu.api.conversations.domain.exceptions.MemberNotAtEstablishmentEx
 import com.takodu.api.conversations.domain.exceptions.MemberNotFoundException;
 import com.takodu.api.conversations.domain.model.valueobjects.EstablishmentState;
 import com.takodu.api.organization.interfaces.acl.OrganizationContextFacade;
+import com.takodu.api.organization.interfaces.acl.ServiceView;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+import com.takodu.api.shared.domain.model.valueobjects.ServiceId;
 import jakarta.enterprise.context.ApplicationScoped;
+
+import java.time.ZoneId;
+import java.util.Optional;
 
 /** The only class in conversations that talks to organization. */
 @ApplicationScoped
@@ -23,7 +28,13 @@ public class ExternalOrganizationService {
     public EstablishmentState fetchEstablishment(OrganizationId organizationId, EstablishmentId establishmentId) {
         var view = organizationContextFacade.fetchCalendar(organizationId.value(), establishmentId.value())
                 .orElseThrow(() -> new EstablishmentNotFoundException(establishmentId));
-        return new EstablishmentState(establishmentId, view.archived(), view.planActive());
+        return new EstablishmentState(establishmentId, view.name(), ZoneId.of(view.timeZone()), view.archived(),
+                view.planActive());
+    }
+
+    /** @return the service's name, active or not; empty when it is not in the organization */
+    public Optional<String> fetchServiceName(OrganizationId organizationId, ServiceId serviceId) {
+        return organizationContextFacade.fetchService(organizationId.value(), serviceId.value()).map(ServiceView::name);
     }
 
     /**

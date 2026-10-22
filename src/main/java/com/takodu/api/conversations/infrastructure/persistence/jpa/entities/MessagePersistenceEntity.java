@@ -14,6 +14,8 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.Setter;
 
 import java.time.Instant;
@@ -56,6 +58,10 @@ public class MessagePersistenceEntity extends AuditableAbstractPersistenceEntity
 
     @Column(name = "template_name", updatable = false)
     private String templateName;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "template_parameters", updatable = false)
+    private String[] templateParameters;
 
     @Convert(converter = DeliveryStatusPersistenceConverter.class)
     @Column(name = "status", nullable = false)

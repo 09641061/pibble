@@ -79,6 +79,11 @@ public class Conversation {
         touch(at);
     }
 
+    /** W11-W13: an appointment notification went to the outbox; it orders the inbox and pauses nobody. */
+    public void recordNotification(Instant at) {
+        touch(at);
+    }
+
     /** W6: the single source of truth for whether free-form messages may be sent. */
     public boolean isWindowOpen(Instant now) {
         return lastInboundAt != null && now.isBefore(windowClosesAt());
