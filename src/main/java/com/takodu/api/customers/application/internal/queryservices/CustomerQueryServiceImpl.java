@@ -5,10 +5,12 @@ import com.takodu.api.customers.application.queryservices.CustomerQueryService;
 import com.takodu.api.customers.domain.model.aggregates.Customer;
 import com.takodu.api.customers.domain.model.queries.GetCustomerByIdQuery;
 import com.takodu.api.customers.domain.model.queries.GetCustomerIncludingDeletedQuery;
+import com.takodu.api.customers.domain.model.queries.GetCustomersIncludingDeletedQuery;
 import com.takodu.api.customers.domain.model.queries.SearchCustomersQuery;
 import com.takodu.api.customers.domain.repositories.CustomerRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -27,6 +29,12 @@ public class CustomerQueryServiceImpl implements CustomerQueryService {
     @Override
     public Optional<Customer> handle(GetCustomerIncludingDeletedQuery query) {
         return customerRepository.findById(query.organizationId(), query.customerId());
+    }
+
+    @Override
+    public List<Customer> handle(GetCustomersIncludingDeletedQuery query) {
+        if (query.customerIds().isEmpty()) return List.of();
+        return customerRepository.findByIds(query.organizationId(), query.customerIds());
     }
 
     @Override

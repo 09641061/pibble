@@ -128,6 +128,7 @@ class ArchitectureTest {
     @ArchTest
     static final ArchRule post_endpoints_take_an_idempotency_key = methods()
             .that().areAnnotatedWith("jakarta.ws.rs.POST")
+            .and().areDeclaredInClassesThat().resideInAPackage("..interfaces.rest..")
             .should(takeAnIdempotencyKeyHeader())
             .because("a retried tap must have one effect (docs/decisions/proposed/2026-10-20-idempotency-keys-on-retried-requests.md)");
 

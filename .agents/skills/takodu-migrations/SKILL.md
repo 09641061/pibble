@@ -57,7 +57,7 @@ Match on the constraint name, not only the SQL state (`23P01` exclusion, `23505`
 
 ## Entities must match the migration
 
-Hibernate runs with `validate`, so an entity column without a migration fails at startup. In the same commit, the migration adds the column and the persistence entity, converter and assembler map it ([takodu-ddd](../takodu-ddd/SKILL.md)). Use `@Version` with an `integer version` column on aggregates that staff and jobs change concurrently (`appointments`, `conversations`).
+Hibernate runs with `validate`, so an entity column without a migration fails at startup. In the same commit, the migration adds the column and the persistence entity, converter and assembler map it ([takodu-ddd](../takodu-ddd/SKILL.md)). Aggregates that staff and jobs change concurrently get `@Version` (`appointments`) or every writer locks them `FOR UPDATE` (`conversations`).
 
 ## Tests
 

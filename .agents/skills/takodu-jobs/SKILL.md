@@ -5,7 +5,7 @@ description: How background work runs in the pibble backend — work stored as r
 
 # Background jobs in pibble
 
-Slow or failing work never runs inside a request or webhook transaction. The transaction inserts a row; a job claims the row and does the work. The decision is [webhooks store first; outgoing work is polled from tables](../../../docs/decisions/proposed/2026-10-19-webhooks-store-first-and-polled-outbox.md). Package names are relative to `com.takodu.api`.
+Slow or failing work never runs inside a request or webhook transaction. The transaction inserts a row; a job claims the row and does the work. The decision is [webhooks store first; outgoing work is polled from tables](../../../docs/decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md). Package names are relative to `com.takodu.api`.
 
 ## The jobs
 

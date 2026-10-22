@@ -4,6 +4,7 @@ import com.takodu.api.customers.infrastructure.persistence.jpa.entities.Customer
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,6 +27,10 @@ public class CustomerPersistenceRepository implements PanacheRepositoryBase<Cust
 
     public Optional<CustomerPersistenceEntity> findById(UUID organizationId, UUID id) {
         return find("organizationId = ?1 and id = ?2", organizationId, id).firstResultOptional();
+    }
+
+    public List<CustomerPersistenceEntity> findByIds(UUID organizationId, Collection<UUID> ids) {
+        return list("organizationId = ?1 and id in ?2", organizationId, ids);
     }
 
     /** Waits for a concurrent insert of the same phone, then does nothing; {@code customers_phone_uk} is the arbiter. */

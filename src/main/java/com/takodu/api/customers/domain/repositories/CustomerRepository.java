@@ -6,6 +6,7 @@ import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +16,9 @@ public interface CustomerRepository {
 
     /** @return the customer, deleted or not */
     Optional<Customer> findById(OrganizationId organizationId, CustomerId customerId);
+
+    /** @return the customers found, deleted or not; ids of other organizations are skipped */
+    List<Customer> findByIds(OrganizationId organizationId, Collection<CustomerId> customerIds);
 
     Optional<Customer> findActiveByPhone(OrganizationId organizationId, PhoneNumber phone);
 
