@@ -8,6 +8,7 @@ import com.takodu.api.booking.domain.model.aggregates.Appointment;
 import com.takodu.api.booking.domain.model.queries.GetAppointmentByIdQuery;
 import com.takodu.api.booking.domain.model.queries.GetAppointmentsByEstablishmentQuery;
 import com.takodu.api.booking.domain.model.queries.GetAvailableSlotsQuery;
+import com.takodu.api.booking.domain.model.queries.GetUpcomingAppointmentsByCustomerQuery;
 import com.takodu.api.booking.domain.model.queries.GetUpcomingAppointmentsByMemberQuery;
 import com.takodu.api.booking.domain.model.valueobjects.Slot;
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
@@ -38,5 +39,8 @@ public interface AppointmentQueryService {
     List<Slot> handle(GetAvailableSlotsQuery query);
 
     /** @return the member's confirmed appointments starting after the query's instant, earliest first */
+    /** A4: the customer's appointments at one establishment, for the assistant talking to them there. */
+    List<Appointment> handle(GetUpcomingAppointmentsByCustomerQuery query);
+
     List<Appointment> handle(GetUpcomingAppointmentsByMemberQuery query);
 }

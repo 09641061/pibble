@@ -34,7 +34,7 @@ public final class AppointmentTransitionCommandFromResourceAssembler {
         var cancelledBy = resource.cancelledBy() == null ? CancelledBy.STAFF
                 : parse(CancelledBy.class, resource.cancelledBy(), "cancelledBy must be staff or customer");
         return new CancelAppointmentCommand(organizationId, new AppointmentId(appointmentId),
-                new CancelReason(resource.reason()), cancelledBy, new IdempotencyKey(idempotencyKey));
+                new CancelReason(resource.reason()), cancelledBy, BookingSource.STAFF, new IdempotencyKey(idempotencyKey));
     }
 
     public static ChangeAppointmentStatusCommand toChangeStatusCommandFromResource(

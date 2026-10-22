@@ -17,7 +17,8 @@ public final class ConversationPersistenceAssembler {
                 new EstablishmentId(entity.getEstablishmentId()), new WhatsappLineId(entity.getLineId()),
                 new CustomerId(entity.getCustomerId()),
                 entity.getAssignedMemberId() == null ? null : new MemberId(entity.getAssignedMemberId()),
-                entity.getBotPausedUntil(), entity.getLastInboundAt(), entity.getLastMessageAt(), entity.getUnreadCount());
+                entity.getBotPausedUntil(), entity.getLastInboundAt(), entity.getLastMessageAt(), entity.getUnreadCount(),
+                entity.getAssistantHandedOffAt(), entity.getHandoffSummary());
     }
 
     public static ConversationPersistenceEntity toPersistenceFromDomain(Conversation conversation) {
@@ -33,6 +34,8 @@ public final class ConversationPersistenceAssembler {
         entity.setLastInboundAt(conversation.getLastInboundAt());
         entity.setLastMessageAt(conversation.getLastMessageAt());
         entity.setUnreadCount(conversation.getUnreadCount());
+        entity.setAssistantHandedOffAt(conversation.getAssistantHandedOffAt());
+        entity.setHandoffSummary(conversation.getHandoffSummary());
         return entity;
     }
 }

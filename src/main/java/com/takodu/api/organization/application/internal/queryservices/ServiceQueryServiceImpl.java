@@ -6,6 +6,7 @@ import com.takodu.api.organization.domain.exceptions.EstablishmentNotFoundExcept
 import com.takodu.api.organization.domain.model.aggregates.Member;
 import com.takodu.api.organization.domain.model.aggregates.Service;
 import com.takodu.api.organization.domain.model.queries.GetBookableServiceQuery;
+import com.takodu.api.organization.domain.model.queries.GetBookableServicesByEstablishmentQuery;
 import com.takodu.api.organization.domain.model.queries.GetServiceByIdQuery;
 import com.takodu.api.organization.domain.model.queries.GetServicesByEstablishmentQuery;
 import com.takodu.api.organization.domain.repositories.EstablishmentRepository;
@@ -14,6 +15,7 @@ import com.takodu.api.organization.domain.repositories.ServiceRepository;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,13 +52,26 @@ public class ServiceQueryServiceImpl implements ServiceQueryService {
     /** A team is a few dozen members, so filtering the whole team is cheaper than a query per performer. */
     @Override
     public Optional<BookableService> handle(GetBookableServiceQuery query) {
-        return serviceRepository.findById(query.organizationId(), query.serviceId()).map(service -> {
-            var performers = memberRepository.findCurrent(query.organizationId()).stream()
-                    .filter(member -> service.getPerformerIds().contains(member.getId()))
-                    .filter(member -> member.canPerformAt(service.getEstablishmentId()))
-                    .sorted(Member.TEAM_ORDER)
-                    .toList();
-            return new BookableService(service, performers);
-        });
+        return serviceRepository.findById(query.organizationId(), query.serviceId())
+                .map(service -> bookable(service, memberRepository.findCurrent(query.organizationId())));
+    }
+
+    @Override
+    public List<BookableService> handle(GetBookableServicesByEstablishmentQuery query) {
+        var team = memberRepository.findCurrent(query.organizationId());
+        return serviceRepository.findByEstablishment(query.organizationId(), query.establishmentId()).stream()
+                .filter(Service::isActive)
+                .sorted(Comparator.comparing(Service::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(service -> bookable(service, team))
+                .toList();
+    }
+
+    private static BookableService bookable(Service service, List<Member> team) {
+        var performers = team.stream()
+                .filter(member -> service.getPerformerIds().contains(member.getId()))
+                .filter(member -> member.canPerformAt(service.getEstablishmentId()))
+                .sorted(Member.TEAM_ORDER)
+                .toList();
+        return new BookableService(service, performers);
     }
 }

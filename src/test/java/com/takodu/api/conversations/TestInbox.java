@@ -20,8 +20,15 @@ public final class TestInbox {
      * @return the conversation the customer's message landed in
      */
     public static UUID customerWrites(TestTenant viewer, UUID establishmentId, String line, String waId, Instant at) {
+        return customerWrites(viewer, establishmentId, line, waId, at, "Hola, ¿tienen cita mañana a las 4?");
+    }
+
+    /** @param body what the customer wrote */
+    public static UUID customerWrites(TestTenant viewer, UUID establishmentId, String line, String waId, Instant at,
+                                      String body) {
         MetaWebhooks.post(MetaWebhooks.payload("text-message", Map.of("PHONE_NUMBER_ID", line, "WA_ID", waId,
-                "WAMID", MetaWebhooks.newWamid(), "TIMESTAMP", String.valueOf(at.getEpochSecond())))).statusCode(200);
+                "WAMID", MetaWebhooks.newWamid(), "TIMESTAMP", String.valueOf(at.getEpochSecond()), "BODY", body)))
+                .statusCode(200);
         String id = given().spec(viewer.spec()).get("/api/v1/establishments/" + establishmentId + "/conversations")
                 .then().statusCode(200)
                 .extract().path("items.find { it.customerPhone == '+%s' }.id".formatted(waId));

@@ -101,6 +101,6 @@ class MessageTest {
     private static Conversation conversation() {
         return new Conversation(new ConversationId(UUID.randomUUID()), new OrganizationId(UUID.randomUUID()),
                 new EstablishmentId(UUID.randomUUID()), new WhatsappLineId(UUID.randomUUID()),
-                new CustomerId(UUID.randomUUID()), null, null, NOW, NOW, 1);
+                new CustomerId(UUID.randomUUID()), null, null, NOW, NOW, 1, null, null);
     }
 }

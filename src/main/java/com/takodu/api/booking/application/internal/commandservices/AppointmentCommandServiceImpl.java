@@ -4,6 +4,7 @@ import com.takodu.api.booking.application.commandservices.AppointmentCommandServ
 import com.takodu.api.booking.application.internal.outboundservices.acl.ExternalCustomersService;
 import com.takodu.api.booking.application.internal.outboundservices.acl.ExternalOrganizationService;
 import com.takodu.api.booking.domain.exceptions.AppointmentNotFoundException;
+import com.takodu.api.booking.domain.exceptions.CustomerChangeTooLateException;
 import com.takodu.api.booking.domain.exceptions.ServiceNotBookableException;
 import com.takodu.api.booking.domain.model.aggregates.Appointment;
 import com.takodu.api.booking.domain.model.commands.BookAppointmentCommand;
@@ -11,6 +12,7 @@ import com.takodu.api.booking.domain.model.commands.CancelAppointmentCommand;
 import com.takodu.api.booking.domain.model.commands.ChangeAppointmentStatusCommand;
 import com.takodu.api.booking.domain.model.commands.RescheduleAppointmentCommand;
 import com.takodu.api.booking.domain.model.valueobjects.AppointmentId;
+import com.takodu.api.booking.domain.model.valueobjects.BookingSource;
 import com.takodu.api.booking.domain.model.valueobjects.EstablishmentCalendar;
 import com.takodu.api.booking.domain.model.valueobjects.ServiceOffer;
 import com.takodu.api.booking.domain.repositories.AppointmentRepository;
@@ -102,6 +104,7 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
     public Appointment handle(RescheduleAppointmentCommand command) {
         var appointment = load(command.organizationId(), command.appointmentId());
         if (appointment.alreadyApplied(command.idempotencyKey())) return appointment;
+        requireCustomerMayChange(appointment, command.source());
         var calendar = externalOrganizationService.fetchCalendar(command.organizationId(), appointment.getEstablishmentId());
         if (!calendar.planActive()) throw new PlanInactiveException(command.organizationId().value());
         var service = externalOrganizationService.fetchServiceOffer(command.organizationId(), appointment.getServiceId());
@@ -126,6 +129,7 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
     public Appointment handle(CancelAppointmentCommand command) {
         var appointment = load(command.organizationId(), command.appointmentId());
         if (appointment.alreadyApplied(command.idempotencyKey())) return appointment;
+        requireCustomerMayChange(appointment, command.source());
         appointment.cancel(command.reason(), command.cancelledBy(), command.idempotencyKey());
         var saved = appointmentRepository.save(appointment);
         appointmentCancelled.fire(new AppointmentCancelledIntegrationEvent(command.organizationId().value(),
@@ -151,6 +155,12 @@ public class AppointmentCommandServiceImpl implements AppointmentCommandService 
                 .orElseThrow(() -> new AppointmentNotFoundException(appointmentId));
         accessPolicy.requireEstablishment(appointment.getEstablishmentId());
         return appointment;
+    }
+
+    /** B14: staff change an appointment at any time; the assistant only until 2 hours before it starts. */
+    private void requireCustomerMayChange(Appointment appointment, BookingSource source) {
+        if (source == BookingSource.ASSISTANT && !appointment.customerMayChange(clock.instant()))
+            throw new CustomerChangeTooLateException();
     }
 
     /** B1, B7: what the service and its establishment need before any member or time is looked at. */

@@ -41,4 +41,10 @@ public class ConversationPersistenceEntity extends AuditableAbstractPersistenceE
 
     @Column(name = "unread_count", nullable = false)
     private int unreadCount;
+
+    @Column(name = "assistant_handed_off_at")
+    private Instant assistantHandedOffAt;
+
+    @Column(name = "handoff_summary")
+    private String handoffSummary;
 }

@@ -5,6 +5,7 @@ import com.takodu.api.conversations.domain.exceptions.MemberNotAtEstablishmentEx
 import com.takodu.api.conversations.domain.exceptions.MemberNotFoundException;
 import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.commands.AssignConversationCommand;
+import com.takodu.api.conversations.domain.model.commands.HandOffConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
 
@@ -24,4 +25,11 @@ public interface ConversationCommandService {
      * @throws MemberNotAtEstablishmentException when the member cannot see that inbox
      */
     Conversation handle(AssignConversationCommand command);
+
+    /**
+     * A7: the assistant hands the chat to a person. Runs without a caller, for the assistant's turn.
+     *
+     * @throws ConversationNotFoundException when the conversation is not in the organization
+     */
+    Conversation handle(HandOffConversationCommand command);
 }

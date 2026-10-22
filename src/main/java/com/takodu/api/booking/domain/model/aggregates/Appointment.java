@@ -19,6 +19,7 @@ import com.takodu.api.shared.domain.model.valueobjects.TimeRange;
 import com.takodu.api.shared.domain.model.valueobjects.UserId;
 import lombok.Getter;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
@@ -29,6 +30,9 @@ import java.util.Objects;
  */
 @Getter
 public class Appointment {
+    /** B14: the customer changes an appointment through the assistant at most this long before it starts. */
+    public static final Duration CUSTOMER_CHANGE_CUTOFF = Duration.ofHours(2);
+
     private final AppointmentId id;
     private final OrganizationId organizationId;
     private final EstablishmentId establishmentId;
@@ -126,6 +130,14 @@ public class Appointment {
             throw new NoShowBeforeStartException();
         moveTo(next);
         this.lastIdempotencyKey = idempotencyKey;
+    }
+
+    /**
+     * B14: whether the customer may still reschedule or cancel it through the assistant: only a confirmed appointment,
+     * and only until 2 hours before it starts. Later, a person decides.
+     */
+    public boolean customerMayChange(Instant now) {
+        return status == AppointmentStatus.CONFIRMED && !now.isAfter(range.start().minus(CUSTOMER_CHANGE_CUTOFF));
     }
 
     /** @return whether a transition with this key was already applied, so a retry returns the current state */

@@ -1,5 +1,6 @@
 package com.takodu.api.organization.application.acl;
 
+import com.takodu.api.organization.application.queryservices.BookableService;
 import com.takodu.api.organization.application.queryservices.EstablishmentQueryService;
 import com.takodu.api.organization.application.queryservices.MemberQueryService;
 import com.takodu.api.organization.application.queryservices.OrganizationQueryService;
@@ -7,6 +8,7 @@ import com.takodu.api.organization.application.queryservices.ServiceQueryService
 import com.takodu.api.organization.domain.model.aggregates.Establishment;
 import com.takodu.api.organization.domain.model.aggregates.Member;
 import com.takodu.api.organization.domain.model.queries.GetBookableServiceQuery;
+import com.takodu.api.organization.domain.model.queries.GetBookableServicesByEstablishmentQuery;
 import com.takodu.api.organization.domain.model.queries.GetEstablishmentCalendarQuery;
 import com.takodu.api.organization.domain.model.queries.GetMemberByIdQuery;
 import com.takodu.api.organization.domain.model.queries.GetOrganizationByIdQuery;
@@ -22,6 +24,7 @@ import com.takodu.api.shared.domain.model.valueobjects.ServiceId;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -56,12 +59,13 @@ public class OrganizationContextFacadeImpl implements OrganizationContextFacade 
     @Override
     public Optional<ServiceView> fetchService(UUID organizationId, UUID serviceId) {
         return serviceQueryService.handle(new GetBookableServiceQuery(new OrganizationId(organizationId),
-                new ServiceId(serviceId))).map(bookable -> {
-            var service = bookable.service();
-            return new ServiceView(service.getId().value(), service.getEstablishmentId().value(), service.getName(),
-                    (int) service.getDuration().toMinutes(), service.getPrice().cents(), service.getPrice().currency(),
-                    service.isActive(), bookable.performers().stream().map(member -> member.getId().value()).toList());
-        });
+                new ServiceId(serviceId))).map(OrganizationContextFacadeImpl::view);
+    }
+
+    @Override
+    public List<ServiceView> fetchActiveServices(UUID organizationId, UUID establishmentId) {
+        return serviceQueryService.handle(new GetBookableServicesByEstablishmentQuery(new OrganizationId(organizationId),
+                new EstablishmentId(establishmentId))).stream().map(OrganizationContextFacadeImpl::view).toList();
     }
 
     @Override
@@ -72,12 +76,20 @@ public class OrganizationContextFacadeImpl implements OrganizationContextFacade 
                         member.worksAt(new EstablishmentId(establishmentId))));
     }
 
+    private static ServiceView view(BookableService bookable) {
+        var service = bookable.service();
+        return new ServiceView(service.getId().value(), service.getEstablishmentId().value(), service.getName(),
+                (int) service.getDuration().toMinutes(), service.getPrice().cents(), service.getPrice().currency(),
+                service.isActive(), bookable.performers().stream().map(member -> member.getId().value()).toList(),
+                service.getInstructions());
+    }
+
     private static EstablishmentCalendarView calendar(Establishment establishment, boolean planActive) {
         var openingHours = establishment.getSchedule().ranges().stream()
                 .map(range -> new OpeningRangeView(range.day().getValue(), range.opensAt(), range.closesAt()))
                 .toList();
         return new EstablishmentCalendarView(establishment.getId().value(), establishment.getName(),
-                establishment.getTimeZone().value().getId(),
+                establishment.getAddress(), establishment.getTimeZone().value().getId(),
                 openingHours, !establishment.isActive(), planActive);
     }
 }

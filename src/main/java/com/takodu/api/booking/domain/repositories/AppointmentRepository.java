@@ -32,6 +32,10 @@ public interface AppointmentRepository {
     List<Appointment> findByEstablishment(OrganizationId organizationId, EstablishmentId establishmentId,
                                           TimeRange window);
 
+    /** @return the customer's confirmed appointments at the establishment starting after the instant, earliest first */
+    List<Appointment> findUpcomingByCustomer(OrganizationId organizationId, EstablishmentId establishmentId,
+                                             CustomerId customerId, Instant after);
+
     /** @return the member's confirmed appointments starting after the instant, earliest first */
     List<Appointment> findUpcomingByMember(OrganizationId organizationId, MemberId memberId, Instant after);
 

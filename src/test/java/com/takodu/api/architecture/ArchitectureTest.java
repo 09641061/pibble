@@ -130,7 +130,7 @@ class ArchitectureTest {
             .that().areAnnotatedWith("jakarta.ws.rs.POST")
             .and().areDeclaredInClassesThat().resideInAPackage("..interfaces.rest..")
             .should(takeAnIdempotencyKeyHeader())
-            .because("a retried tap must have one effect (docs/decisions/proposed/2026-10-20-idempotency-keys-on-retried-requests.md)");
+            .because("a retried tap must have one effect (docs/decisions/implemented/2026-10-20-idempotency-keys-on-retried-requests.md)");
 
     @ArchTest
     static final ArchRule controllers_are_named_controller = classes()

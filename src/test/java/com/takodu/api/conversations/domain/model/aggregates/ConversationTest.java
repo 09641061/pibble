@@ -15,6 +15,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConversationTest {
@@ -78,6 +79,32 @@ class ConversationTest {
         conversation.recordHistory(NOW.minus(Duration.ofDays(3)));
         conversation.recordInbound(NOW.plusSeconds(5));
 
+        assertEquals(NOW.plusSeconds(5), conversation.getLastMessageAt());
+    }
+
+    @Test
+    void handOffKeepsTheAssistantQuietUntilResumedAndLeavesTheChatUnread() {
+        var conversation = start();
+        conversation.recordInbound(NOW);
+        conversation.markRead();
+
+        conversation.handOff("  Quiere hablar con la dueña  ", NOW);
+
+        assertTrue(conversation.isAssistantPaused(NOW.plus(Duration.ofDays(30))));
+        assertEquals("Quiere hablar con la dueña", conversation.getHandoffSummary());
+        assertEquals(1, conversation.getUnreadCount());
+        assertThrows(IllegalArgumentException.class, () -> conversation.handOff(" ", NOW));
+    }
+
+    @Test
+    void assistantReplyLeavesTheCustomersMessagesUnread() {
+        var conversation = start();
+        conversation.recordInbound(NOW);
+
+        conversation.recordAssistantOutbound(NOW.plusSeconds(5));
+
+        assertEquals(1, conversation.getUnreadCount());
+        assertFalse(conversation.isAssistantPaused(NOW.plusSeconds(5)));
         assertEquals(NOW.plusSeconds(5), conversation.getLastMessageAt());
     }
 
