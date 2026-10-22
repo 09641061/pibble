@@ -54,6 +54,29 @@ class AccessPolicyTest {
     }
 
     @Test
+    void assistantMayOnlyBookInItsOwnEstablishment() {
+        var context = new TenantContext();
+        context.bindAssistant(new OrganizationId(UUID.randomUUID()), assigned);
+        var policy = new AccessPolicy(context);
+
+        assertDoesNotThrow(() -> policy.require(Action.BOOK_APPOINTMENTS));
+        assertDoesNotThrow(() -> policy.requireEstablishment(assigned));
+        assertThrows(AccessDeniedException.class, () -> policy.require(Action.REPLY_IN_INBOX));
+        assertThrows(AccessDeniedException.class, () -> policy.require(Action.DELETE_CUSTOMERS));
+        assertThrows(AccessDeniedException.class, () -> policy.requireEstablishment(other));
+    }
+
+    @Test
+    void assistantIsNoMember() {
+        var context = new TenantContext();
+        context.bindAssistant(new OrganizationId(UUID.randomUUID()), assigned);
+
+        assertThrows(IllegalStateException.class, context::memberId);
+        assertThrows(IllegalStateException.class, context::userId);
+        assertThrows(IllegalStateException.class, context::role);
+    }
+
+    @Test
     void readingAnUnboundContextFails() {
         assertThrows(IllegalStateException.class, () -> new TenantContext().organizationId());
     }

@@ -68,10 +68,12 @@ Webhooks, scheduled jobs and integration event handlers run without a `TenantCon
 |---|---|
 | WhatsApp webhook | The `WhatsappLine` found by `phone_number_id` → its establishment → organization |
 | `ScheduledMessageDispatcher` | The appointment of the scheduled row |
-| `TurnWorker` | The conversation of the turn |
+| `TurnWorker` | The conversation of the turn; it then binds the assistant (below) |
 | Event handler | The `organizationId` carried by the integration event |
 
 Services called from both a request and a job take the `OrganizationId` as a command field and do not call `AccessPolicy`; the controller-facing service checks access before delegating.
+
+**The assistant is the exception.** A turn activates a request context and calls `TenantContext.bindAssistant(organization, establishment)`. The assistant has no user, member or role (reading them throws); `AccessPolicy` allows it only `Action.allowsAssistant()` actions, in its own establishment, so booking checks it like staff.
 
 ## Testing
 

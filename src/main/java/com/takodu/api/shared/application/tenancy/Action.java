@@ -4,7 +4,10 @@ import com.takodu.api.shared.domain.model.valueobjects.Role;
 
 import java.util.Set;
 
-/** Fixed permissions per role (product docs §5). Changing a row is a product decision. */
+/**
+ * Fixed permissions per role (product docs §5). Changing a row is a product decision. The assistant is no role: it may
+ * only book, reschedule and cancel for the customer it is talking to (A5).
+ */
 public enum Action {
     MANAGE_ORGANIZATION(Role.OWNER),
     MANAGE_ESTABLISHMENTS(Role.OWNER),
@@ -30,5 +33,10 @@ public enum Action {
      */
     public boolean allows(Role role) {
         return allowed.contains(role);
+    }
+
+    /** @return whether the assistant may perform the action, in its own establishment (A5) */
+    public boolean allowsAssistant() {
+        return this == BOOK_APPOINTMENTS;
     }
 }
