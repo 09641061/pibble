@@ -8,6 +8,7 @@ import jakarta.persistence.Tuple;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /** Reads conversations rows directly, so webhook tests assert what was stored, not what was logged. */
 public final class ConversationRows {
@@ -25,6 +26,14 @@ public final class ConversationRows {
                 select c.*, cu.phone_e164, cu.whatsapp_profile_name from conversations c
                 join whatsapp_lines l on l.id = c.line_id join customers cu on cu.id = c.customer_id
                 where l.phone_number_id = :phoneNumberId""", Map.of("phoneNumberId", phoneNumberId));
+    }
+
+    /** @return the appointment's notifications by kind, such as {@code reminder}, as column maps */
+    public static Map<String, Map<String, Object>> notificationsOf(UUID appointmentId) {
+        var byKind = new HashMap<String, Map<String, Object>>();
+        rows("select * from scheduled_messages where appointment_id = :id", Map.of("id", appointmentId))
+                .forEach(row -> byKind.put((String) row.get("kind"), row));
+        return byKind;
     }
 
     public static String lineStatus(String phoneNumberId) {
