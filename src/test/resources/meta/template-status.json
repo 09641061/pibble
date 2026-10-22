@@ -1,0 +1,18 @@
+{
+  "entry": [{
+    "id": "${WABA_ID}",
+    "time": 1751247548,
+    "changes": [{
+      "value": {
+        "event": "${EVENT}",
+        "message_template_id": 1689556908129832,
+        "message_template_name": "${TEMPLATE_NAME}",
+        "message_template_language": "es",
+        "reason": "NONE",
+        "message_template_category": "UTILITY"
+      },
+      "field": "message_template_status_update"
+    }]
+  }],
+  "object": "whatsapp_business_account"
+}

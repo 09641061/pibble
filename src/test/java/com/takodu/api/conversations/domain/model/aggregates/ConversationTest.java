@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -83,7 +84,7 @@ class ConversationTest {
     private static Conversation start() {
         var line = new WhatsappLine(new WhatsappLineId(UUID.randomUUID()), new OrganizationId(UUID.randomUUID()),
                 new EstablishmentId(UUID.randomUUID()), "1", "2", "+51", new EncryptedToken("t"), LineMode.COEXISTENCE,
-                true, NOW, null);
+                true, NOW, null, Map.of());
         return Conversation.start(line, new CustomerId(UUID.randomUUID()), NOW.minus(Duration.ofDays(30)));
     }
 }

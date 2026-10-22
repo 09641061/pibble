@@ -10,6 +10,8 @@ import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 
+import java.util.List;
+
 public final class MessagePersistenceAssembler {
     private MessagePersistenceAssembler() { }
 
@@ -18,7 +20,9 @@ public final class MessagePersistenceAssembler {
                 new ConversationId(entity.getConversationId()), entity.getDirection(), entity.getOrigin(),
                 entity.getWamid() == null ? null : new Wamid(entity.getWamid()),
                 new MessageContent(entity.getKind(), entity.getBody(), entity.getMediaId(), entity.getMediaMime()),
-                entity.getTemplateName(), entity.getStatus(), entity.getError(), entity.getPricingCategory(),
+                entity.getTemplateName(),
+                entity.getTemplateParameters() == null ? List.of() : List.of(entity.getTemplateParameters()),
+                entity.getStatus(), entity.getError(), entity.getPricingCategory(),
                 entity.getBillable(), entity.getSentByMemberId() == null ? null : new MemberId(entity.getSentByMemberId()),
                 entity.getAttempts(), entity.getNextAttemptAt(),
                 entity.getIdempotencyKey() == null ? null : new IdempotencyKey(entity.getIdempotencyKey()),
@@ -38,6 +42,8 @@ public final class MessagePersistenceAssembler {
         entity.setMediaId(message.getContent().mediaId());
         entity.setMediaMime(message.getContent().mediaMime());
         entity.setTemplateName(message.getTemplateName());
+        entity.setTemplateParameters(message.getTemplateName() == null ? null
+                : message.getTemplateParameters().toArray(String[]::new));
         entity.setStatus(message.getStatus());
         entity.setError(message.getError());
         entity.setPricingCategory(message.getPricingCategory());

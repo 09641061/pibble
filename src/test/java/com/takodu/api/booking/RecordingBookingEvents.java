@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Stands in for the listeners that conversations will add: records booking's integration events in every test. */
+/** Records booking's integration events in every test, so booking checks what it publishes apart from its listeners. */
 @Singleton
 public class RecordingBookingEvents {
     private final List<Object> events = new CopyOnWriteArrayList<>();

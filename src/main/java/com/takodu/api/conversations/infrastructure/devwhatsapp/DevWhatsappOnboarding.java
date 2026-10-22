@@ -5,11 +5,16 @@ import com.takodu.api.conversations.application.internal.outboundservices.whatsa
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.model.valueobjects.EncryptedToken;
 import com.takodu.api.conversations.domain.model.valueobjects.LineMode;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
+import com.takodu.api.conversations.domain.model.valueobjects.TemplateStatus;
 import com.takodu.api.shared.infrastructure.crypto.TokenCipher;
 import io.quarkus.arc.profile.IfBuildProfile;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
+
+import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * Dev mode without Meta ({@code takodu.meta.enabled=false}): accepts any signup, so the inbox can be tried with
@@ -28,7 +33,15 @@ public class DevWhatsappOnboarding implements WhatsappOnboarding {
     @Override
     public OnboardedNumber onboard(String code, String wabaId, String phoneNumberId, LineMode mode, String pin) {
         Log.infof("Dev signup accepted for phone number id %s", phoneNumberId);
-        return new OnboardedNumber("+51 900 000 000", new EncryptedToken(tokenCipher.encrypt("dev-token")));
+        return new OnboardedNumber("+51 900 000 000", new EncryptedToken(tokenCipher.encrypt("dev-token")),
+                approvedTemplates());
+    }
+
+    /** @return every notification template, approved at once as Meta often does for utility templates */
+    private static Map<NotificationTemplate, TemplateStatus> approvedTemplates() {
+        var templates = new EnumMap<NotificationTemplate, TemplateStatus>(NotificationTemplate.class);
+        for (var template : NotificationTemplate.values()) templates.put(template, TemplateStatus.APPROVED);
+        return templates;
     }
 
     @Override

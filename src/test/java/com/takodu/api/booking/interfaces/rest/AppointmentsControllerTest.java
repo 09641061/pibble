@@ -316,6 +316,7 @@ public class AppointmentsControllerTest {
         var cancelled = events.about(UUID.fromString(id)).stream()
                 .filter(AppointmentCancelledIntegrationEvent.class::isInstance).toList();
         assertEquals(1, cancelled.size());
+        assertEquals(salon.serviceId(), ((AppointmentCancelledIntegrationEvent) cancelled.getFirst()).serviceId());
         book(salon.owner(), UUID.randomUUID(), body(salon, null, ten)).statusCode(201);
     }
 

@@ -14,6 +14,7 @@ import com.takodu.api.conversations.domain.model.commands.RecordBusinessAppEchoC
 import com.takodu.api.conversations.domain.model.commands.RecordDeliveryStatusCommand;
 import com.takodu.api.conversations.domain.model.commands.RecordHistoryMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.RecordInboundMessageCommand;
+import com.takodu.api.conversations.domain.model.commands.RecordTemplateStatusCommand;
 import com.takodu.api.conversations.domain.model.commands.VerifyWhatsappWebhookCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
@@ -70,6 +71,7 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
                 case RecordHistoryMessageCommand history -> record(history);
                 case RecordDeliveryStatusCommand status -> record(status);
                 case DisconnectAccountLinesCommand disconnect -> record(disconnect);
+                case RecordTemplateStatusCommand template -> record(template);
             };
             conversation.ifPresent(found -> changed.putIfAbsent(found.getId(), new ConversationChangedEvent(
                     found.getOrganizationId(), found.getEstablishmentId(), found.getId())));
@@ -137,6 +139,17 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
             line.disconnect();
             whatsappLineRepository.save(line);
             Log.infof("WhatsApp line %s disconnected by Meta", line.getId().value());
+        }
+        return Optional.empty();
+    }
+
+    /** Templates belong to the account, so every connected line of it learns the new status. */
+    private Optional<Conversation> record(RecordTemplateStatusCommand command) {
+        for (var line : whatsappLineRepository.findConnectedByWabaId(command.wabaId())) {
+            line.recordTemplateStatus(command.template(), command.status());
+            whatsappLineRepository.save(line);
+            Log.infof("Template %s is %s on WhatsApp line %s", command.template().metaName(), command.status(),
+                    line.getId().value());
         }
         return Optional.empty();
     }

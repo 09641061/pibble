@@ -5,7 +5,7 @@ description: How the pibble conversations context integrates the Meta WhatsApp C
 
 # WhatsApp in pibble
 
-WhatsApp is the core of the product: **a customer message is never lost and never stored twice.** All Meta code lives in `conversations`. The decisions are [official Cloud API with coexistence](../../../docs/decisions/proposed/2026-10-19-official-whatsapp-cloud-api-with-coexistence.md), [webhooks store first](../../../docs/decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md) and [message as its own aggregate](../../../docs/decisions/implemented/2026-10-19-message-as-its-own-aggregate.md). The product design is `../docs/07-whatsapp-integration.md`; rules W1–W15 are in `../docs/03-business-domain.md` §4.5.
+WhatsApp is the core of the product: **a customer message is never lost and never stored twice.** All Meta code lives in `conversations`. The decisions are [official Cloud API with coexistence](../../../docs/decisions/implemented/2026-10-19-official-whatsapp-cloud-api-with-coexistence.md), [webhooks store first](../../../docs/decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md) and [message as its own aggregate](../../../docs/decisions/implemented/2026-10-19-message-as-its-own-aggregate.md). The product design is `../docs/07-whatsapp-integration.md`; rules W1–W15 are in `../docs/03-business-domain.md` §4.5.
 
 Meta changes field names, limits and error codes often. **Check every Meta detail against Meta's current documentation when you implement it**, pin the Graph API version in configuration (`takodu.meta.graph-version`), and keep each detail in the one class that owns it.
 
@@ -17,8 +17,8 @@ Meta changes field names, limits and error codes often. **Check every Meta detai
 | `MetaSignatureVerifier` | `infrastructure.meta` | HMAC-SHA256 of the raw body with the app secret, constant-time compare |
 | `MetaWebhookParser` | `infrastructure.meta` | The only class that knows Meta's JSON; turns it into domain-shaped records (`InboundEvent`, `StatusEvent`, `EchoEvent`, …) |
 | `WhatsappWebhookReader` (port) | `application.internal.outboundservices.whatsapp` | Signature check, verify token, and parsing into `WhatsappWebhookCommand`s |
-| `WhatsappGateway` (port) | `application.internal.outboundservices.whatsapp` | `sendText`; buttons, lists, templates and media join as their features ship |
-| `WhatsappOnboarding` (port) | `application.internal.outboundservices.whatsapp` | Embedded Signup steps and unsubscribing |
+| `WhatsappGateway` (port) | `application.internal.outboundservices.whatsapp` | `sendText`, `sendTemplate`; buttons, lists and media join as their features ship |
+| `WhatsappOnboarding` (port) | `application.internal.outboundservices.whatsapp` | Embedded Signup steps, creating the templates, unsubscribing |
 | `MetaGraphClient` | `infrastructure.meta` | Quarkus REST Client for the Graph API calls |
 | `MetaWhatsappGateway`, `MetaWhatsappOnboarding` | `infrastructure.meta` | Implement the ports with `MetaGraphClient`; active when `takodu.meta.enabled` (dev and test use fakes) |
 | `TokenCipher` | `shared.infrastructure.crypto` | AES-256-GCM for business tokens; key from `TOKEN_ENCRYPTION_KEY` |
@@ -38,7 +38,7 @@ Meta's JSON never leaves `infrastructure.meta`: the controller passes the raw bo
 | History sync | origin `history` | No unread, no event, no assistant |
 | Status (`sent`, `delivered`, `read`, `failed`) | Updates the existing message | `DeliveryStatus.advanceTo` only moves forward (W10); keeps pricing and error |
 | Account or partner removed | `WhatsappLine.disconnect()` | Line shown as disconnected |
-| Template status | Template status cache of the line | Reminders wait until approved |
+| Template status | `WhatsappLine.recordTemplateStatus` on the WABA's connected lines | Notifications wait until approved |
 
 Interactive replies (a tapped button or list row) are inbound messages of kind `interactive`/`button` with the selected title in `body`; they open a new window like any customer message. Unknown kinds are stored as `unsupported`, never dropped.
 
@@ -50,7 +50,11 @@ Every outbound message follows the same path, whoever sends it:
 2. It returns the existing message when the request's `Idempotency-Key` was already used, otherwise saves the `Message` as `pending` with that key in the caller's transaction (staff replies also call `recordHumanOutbound`, which pauses the assistant).
 3. `OutboundMessageSender` re-checks those rules, sends it through `WhatsappGateway` and records `sent` with the `wamid`. A failure waits 30 s, doubling each time, and the fifth one, or one Meta would repeat (`WhatsappSendException.retryable()` false), stores `failed` with Meta's error ([takodu-jobs](../takodu-jobs/SKILL.md)).
 
-Limits the gateway enforces before calling Meta: text ≤ 4,096 characters; reply buttons ≤ 3 with titles ≤ 20; list rows ≤ 10 with titles ≤ 24. Templates (`takodu_reminder`, `takodu_confirmation`, `takodu_cancellation`, Spanish, category utility) are created on each business's WABA at connection and must stay about one appointment, never promotional.
+Limits the gateway enforces before calling Meta: text ≤ 4,096 characters; reply buttons ≤ 3 with titles ≤ 20; list rows ≤ 10 with titles ≤ 24.
+
+## Appointment notifications
+
+`NotificationTemplate` holds the three Spanish utility templates, each about one appointment, never promotional. Booking's events insert `ScheduledMessage` rows; `ScheduledMessageDispatcher` queues each due row as `Message.notification`: the template outside the window and for reminders, the same text inside it. Rows wait while plan, line or template forbids sending.
 
 ## Connecting a line
 

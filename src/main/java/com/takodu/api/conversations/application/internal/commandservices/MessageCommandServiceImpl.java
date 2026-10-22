@@ -16,6 +16,7 @@ import com.takodu.api.conversations.domain.model.commands.SendStaffMessageComman
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.events.OutboundMessageQueuedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.conversations.domain.repositories.MessageRepository;
 import com.takodu.api.conversations.domain.repositories.WhatsappLineRepository;
@@ -122,7 +123,11 @@ public class MessageCommandServiceImpl implements MessageCommandService {
             message.fail("The customer no longer exists");
         } else {
             try {
-                message.markSent(whatsappGateway.sendText(line, customer.get().whatsappId(), message.getContent().body()));
+                var to = customer.get().whatsappId();
+                message.markSent(message.getContent().kind() == MessageKind.TEMPLATE
+                        ? whatsappGateway.sendTemplate(line, to, message.getTemplateName(), NotificationTemplate.LANGUAGE,
+                                message.getTemplateParameters())
+                        : whatsappGateway.sendText(line, to, message.getContent().body()));
             } catch (WhatsappSendException e) {
                 Log.warnf("Sending message %s failed: %s", message.getId().value(), e.getMessage());
                 message.recordSendFailure(e.getMessage(), e.retryable(), command.now());

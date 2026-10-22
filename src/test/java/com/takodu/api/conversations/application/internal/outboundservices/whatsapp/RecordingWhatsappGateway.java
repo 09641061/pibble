@@ -22,14 +22,25 @@ public class RecordingWhatsappGateway implements WhatsappGateway {
 
     @Override
     public Wamid sendText(WhatsappLine line, String to, String body) {
+        return record(to, body);
+    }
+
+    /** Records the template as {@code name(parameter|parameter|...)}, beside the texts. */
+    @Override
+    public Wamid sendTemplate(WhatsappLine line, String to, String templateName, String language,
+                              List<String> parameters) {
+        return record(to, templateName + "(" + String.join("|", parameters) + ")");
+    }
+
+    private Wamid record(String to, String sentContent) {
         var failure = failures.get(to);
         if (failure != null && failure.remaining.getAndDecrement() > 0)
             throw new WhatsappSendException(failure.error, failure.retryable);
-        sent.computeIfAbsent(to, recipient -> new CopyOnWriteArrayList<>()).add(body);
+        sent.computeIfAbsent(to, recipient -> new CopyOnWriteArrayList<>()).add(sentContent);
         return new Wamid("wamid.SENT" + UUID.randomUUID().toString().replace("-", ""));
     }
 
-    /** @return the texts sent to the WhatsApp id, oldest first */
+    /** @return the texts and templates sent to the WhatsApp id, oldest first */
     public List<String> sentTo(String waId) {
         return sent.getOrDefault(waId, List.of());
     }
