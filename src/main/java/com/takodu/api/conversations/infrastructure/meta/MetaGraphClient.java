@@ -12,6 +12,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.QueryParam;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -56,6 +57,19 @@ public interface MetaGraphClient {
     void register(@PathParam("version") String version, @PathParam("phoneNumberId") String phoneNumberId,
                   @HeaderParam("Authorization") String authorization, RegisterRequest request);
 
+    /** @param name Meta matches names that contain it, so callers compare the exact name and language */
+    @GET
+    @Path("/{version}/{wabaId}/message_templates")
+    TemplateList fetchTemplates(@PathParam("version") String version, @PathParam("wabaId") String wabaId,
+                                @QueryParam("name") String name, @QueryParam("fields") String fields,
+                                @HeaderParam("Authorization") String authorization);
+
+    /** @param template {@code name}, {@code language}, {@code category} and {@code components}; Meta reviews it */
+    @POST
+    @Path("/{version}/{wabaId}/message_templates")
+    TemplateResponse createTemplate(@PathParam("version") String version, @PathParam("wabaId") String wabaId,
+                                    @HeaderParam("Authorization") String authorization, Map<String, Object> template);
+
     /** @param payload a Cloud API message, such as a text with {@code to}, {@code type} and {@code text.body} */
     @POST
     @Path("/{version}/{phoneNumberId}/messages")
@@ -67,6 +81,13 @@ public interface MetaGraphClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record PhoneNumberResponse(@JsonProperty("display_phone_number") String displayPhoneNumber) { }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TemplateList(List<TemplateResponse> data) { }
+
+    /** The creation response carries only {@code id}, {@code status} and {@code category}. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TemplateResponse(String id, String name, String language, String status) { }
 
     record AppDataRequest(@JsonProperty("messaging_product") String messagingProduct,
                           @JsonProperty("sync_type") String syncType) { }

@@ -245,6 +245,28 @@ class WhatsappWebhookControllerTest {
     }
 
     @Test
+    void templateStatusesReachEveryLineOfTheAccount() {
+        var owner = TestTenants.owner();
+        var establishmentId = TestTenants.firstEstablishmentOf(owner);
+        var wabaId = TestWhatsapp.newPhoneNumberId();
+        TestWhatsapp.connect(owner, establishmentId, UUID.randomUUID(), TestWhatsapp.newPhoneNumberId(), wabaId)
+                .statusCode(201).body("templates.reminder", equalTo("approved"));
+
+        post(payload("template-status", Map.of("WABA_ID", wabaId, "EVENT", "PAUSED",
+                "TEMPLATE_NAME", "takodu_reminder"))).statusCode(200);
+        post(payload("template-status", Map.of("WABA_ID", wabaId, "EVENT", "REJECTED",
+                "TEMPLATE_NAME", "someone_elses_template"))).statusCode(200);
+        post(payload("template-status", Map.of("WABA_ID", wabaId, "EVENT", "FLAGGED",
+                "TEMPLATE_NAME", "takodu_confirmation"))).statusCode(200);
+
+        given().spec(owner.spec()).get("/api/v1/establishments/" + establishmentId + "/whatsapp-line")
+                .then().statusCode(200)
+                .body("templates.reminder", equalTo("paused"))
+                .body("templates.confirmation", equalTo("approved"))
+                .body("templates.cancellation", equalTo("approved"));
+    }
+
+    @Test
     void signedBodyThatIsNotJsonIsRefused() {
         post("not json").statusCode(400);
     }

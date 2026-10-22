@@ -7,10 +7,12 @@ import com.takodu.api.conversations.domain.model.commands.RecordBusinessAppEchoC
 import com.takodu.api.conversations.domain.model.commands.RecordDeliveryStatusCommand;
 import com.takodu.api.conversations.domain.model.commands.RecordHistoryMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.RecordInboundMessageCommand;
+import com.takodu.api.conversations.domain.model.commands.RecordTemplateStatusCommand;
 import com.takodu.api.conversations.domain.model.commands.WhatsappWebhookCommand;
 import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageContent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import io.quarkus.logging.Log;
 
@@ -28,7 +30,8 @@ import java.util.stream.Stream;
 
 /**
  * The only class that knows the JSON of Meta's webhooks (fields {@code messages}, {@code smb_message_echoes},
- * {@code history}, {@code account_update}, {@code account_offboarded}), checked against Meta's docs on 2026-10-21.
+ * {@code history}, {@code account_update}, {@code account_offboarded}), checked against Meta's docs on 2026-10-21,
+ * and {@code message_template_status_update}, checked on 2026-10-22.
  * A part it cannot read is skipped with a log line that names no number and no text.
  */
 public final class MetaWebhookParser {
@@ -71,6 +74,7 @@ public final class MetaWebhookParser {
                     case "account_offboarded" -> {
                         if (!wabaId.isEmpty()) facts.add(new DisconnectAccountLinesCommand(wabaId));
                     }
+                    case "message_template_status_update" -> readTemplateStatus(wabaId, value, facts);
                     default -> { }
                 }
             }
@@ -132,6 +136,16 @@ public final class MetaWebhookParser {
                 }
             }
         }
+    }
+
+    /** Only Takodu's own templates in Spanish matter; the business may have others of its own. */
+    private static void readTemplateStatus(String wabaId, JsonNode value, List<WhatsappWebhookCommand> facts) {
+        if (wabaId.isEmpty() || !NotificationTemplate.LANGUAGE.equals(value.path("message_template_language").asText()))
+            return;
+        var template = NotificationTemplate.fromMetaName(value.path("message_template_name").asText());
+        var status = MetaTemplateStatuses.of(value.path("event").asText());
+        if (template.isPresent() && status.isPresent())
+            facts.add(new RecordTemplateStatusCommand(wabaId, template.get(), status.get()));
     }
 
     private static boolean readable(String phoneNumberId, String waId, String wamid) {

@@ -2,11 +2,17 @@ package com.takodu.api.conversations.infrastructure.persistence.jpa.assemblers;
 
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.model.valueobjects.EncryptedToken;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
+import com.takodu.api.conversations.domain.model.valueobjects.TemplateStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.WhatsappLineId;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.entities.WhatsappLinePersistenceEntity;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+
+import java.util.Locale;
+
+import static java.util.stream.Collectors.toMap;
 
 public final class WhatsappLinePersistenceAssembler {
     private WhatsappLinePersistenceAssembler() { }
@@ -16,7 +22,10 @@ public final class WhatsappLinePersistenceAssembler {
                 new EstablishmentId(entity.getEstablishmentId()), entity.getWabaId(), entity.getPhoneNumberId(),
                 entity.getDisplayPhone(), new EncryptedToken(entity.getAccessTokenEncrypted()), entity.getMode(),
                 WhatsappLinePersistenceEntity.CONNECTED.equals(entity.getStatus()), entity.getConnectedAt(),
-                entity.getLastIdempotencyKey() == null ? null : new IdempotencyKey(entity.getLastIdempotencyKey()));
+                entity.getLastIdempotencyKey() == null ? null : new IdempotencyKey(entity.getLastIdempotencyKey()),
+                entity.getTemplates().entrySet().stream().collect(toMap(
+                        template -> NotificationTemplate.valueOf(template.getKey().toUpperCase(Locale.ROOT)),
+                        template -> TemplateStatus.valueOf(template.getValue().toUpperCase(Locale.ROOT)))));
     }
 
     public static WhatsappLinePersistenceEntity toPersistenceFromDomain(WhatsappLine line) {
@@ -33,6 +42,8 @@ public final class WhatsappLinePersistenceAssembler {
                 : WhatsappLinePersistenceEntity.DISCONNECTED);
         entity.setConnectedAt(line.getConnectedAt());
         entity.setLastIdempotencyKey(line.getLastIdempotencyKey() == null ? null : line.getLastIdempotencyKey().value());
+        line.getTemplates().forEach((template, status) -> entity.getTemplates().put(
+                template.name().toLowerCase(Locale.ROOT), status.name().toLowerCase(Locale.ROOT)));
         return entity;
     }
 }

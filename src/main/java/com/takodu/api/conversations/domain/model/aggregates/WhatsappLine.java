@@ -3,6 +3,8 @@ package com.takodu.api.conversations.domain.model.aggregates;
 import com.takodu.api.conversations.domain.exceptions.LineAlreadyConnectedException;
 import com.takodu.api.conversations.domain.model.valueobjects.EncryptedToken;
 import com.takodu.api.conversations.domain.model.valueobjects.LineMode;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
+import com.takodu.api.conversations.domain.model.valueobjects.TemplateStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.WhatsappLineId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
@@ -10,6 +12,9 @@ import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import lombok.Getter;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -29,23 +34,28 @@ public class WhatsappLine {
     private boolean connected;
     private Instant connectedAt;
     private IdempotencyKey lastIdempotencyKey;
+    private final Map<NotificationTemplate, TemplateStatus> templates = new EnumMap<>(NotificationTemplate.class);
 
     /**
+     * @param templates Meta's review of the notification templates, as signup left them; a template missing from it
+     *        could not be created
      * @param wabaId the business's WhatsApp Business Account id
      * @param phoneNumberId Meta's id of the number, which webhooks carry
      * @param displayPhone the number as people read it, such as {@code +51 987 654 321}
      */
     public static WhatsappLine connect(OrganizationId organizationId, EstablishmentId establishmentId, String wabaId,
                                        String phoneNumberId, String displayPhone, EncryptedToken accessToken,
-                                       LineMode mode, Instant now, IdempotencyKey idempotencyKey) {
+                                       LineMode mode, Map<NotificationTemplate, TemplateStatus> templates,
+                                       Instant now, IdempotencyKey idempotencyKey) {
         return new WhatsappLine(null, organizationId, establishmentId, wabaId, phoneNumberId, displayPhone, accessToken,
-                mode, true, now, idempotencyKey);
+                mode, true, now, idempotencyKey, templates);
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
     public WhatsappLine(WhatsappLineId id, OrganizationId organizationId, EstablishmentId establishmentId,
                         String wabaId, String phoneNumberId, String displayPhone, EncryptedToken accessToken,
-                        LineMode mode, boolean connected, Instant connectedAt, IdempotencyKey lastIdempotencyKey) {
+                        LineMode mode, boolean connected, Instant connectedAt, IdempotencyKey lastIdempotencyKey,
+                        Map<NotificationTemplate, TemplateStatus> templates) {
         this.id = id;
         this.organizationId = Objects.requireNonNull(organizationId, "organizationId is required");
         this.establishmentId = Objects.requireNonNull(establishmentId, "establishmentId is required");
@@ -57,6 +67,7 @@ public class WhatsappLine {
         this.connected = connected;
         this.connectedAt = Objects.requireNonNull(connectedAt, "connectedAt is required");
         this.lastIdempotencyKey = lastIdempotencyKey;
+        this.templates.putAll(templates);
     }
 
     /**
@@ -64,7 +75,8 @@ public class WhatsappLine {
      *
      * @throws LineAlreadyConnectedException when the line is still connected (W1)
      */
-    public void reconnect(String wabaId, String displayPhone, EncryptedToken accessToken, LineMode mode, Instant now,
+    public void reconnect(String wabaId, String displayPhone, EncryptedToken accessToken, LineMode mode,
+                          Map<NotificationTemplate, TemplateStatus> templates, Instant now,
                           IdempotencyKey idempotencyKey) {
         if (connected) throw new LineAlreadyConnectedException("This number is already connected to the establishment");
         this.wabaId = requireText(wabaId, "wabaId");
@@ -74,11 +86,29 @@ public class WhatsappLine {
         this.connected = true;
         this.connectedAt = now;
         this.lastIdempotencyKey = idempotencyKey;
+        this.templates.clear();
+        this.templates.putAll(templates);
     }
 
     /** The owner disconnected it, or Meta reported the number removed or banned. Repeating it changes nothing. */
     public void disconnect() {
         connected = false;
+    }
+
+    /** Meta reviewed, paused or disabled one of the templates (webhook {@code message_template_status_update}). */
+    public void recordTemplateStatus(NotificationTemplate template, TemplateStatus status) {
+        templates.put(Objects.requireNonNull(template, "template is required"),
+                Objects.requireNonNull(status, "status is required"));
+    }
+
+    /** @return Meta's review of each template that exists on the account */
+    public Map<NotificationTemplate, TemplateStatus> getTemplates() {
+        return Collections.unmodifiableMap(templates);
+    }
+
+    /** @return whether Meta lets the line send the template now; notifications that need it wait otherwise */
+    public boolean canSend(NotificationTemplate template) {
+        return templates.get(template) == TemplateStatus.APPROVED;
     }
 
     /** @return whether a connection with this key was already applied, so a retry returns the line */

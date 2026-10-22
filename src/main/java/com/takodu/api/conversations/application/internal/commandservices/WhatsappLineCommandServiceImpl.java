@@ -83,11 +83,11 @@ public class WhatsappLineCommandServiceImpl implements WhatsappLineCommandServic
         var now = clock.instant();
         var line = lineToReconnect(command).map(disconnected -> {
             disconnected.reconnect(command.wabaId(), onboarded.displayPhone(), onboarded.accessToken(), command.mode(),
-                    now, command.idempotencyKey());
+                    onboarded.templates(), now, command.idempotencyKey());
             return disconnected;
         }).orElseGet(() -> WhatsappLine.connect(command.organizationId(), command.establishmentId(), command.wabaId(),
-                command.phoneNumberId(), onboarded.displayPhone(), onboarded.accessToken(), command.mode(), now,
-                command.idempotencyKey()));
+                command.phoneNumberId(), onboarded.displayPhone(), onboarded.accessToken(), command.mode(),
+                onboarded.templates(), now, command.idempotencyKey()));
         return whatsappLineRepository.save(line);
     }
 

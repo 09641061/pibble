@@ -12,7 +12,8 @@ public interface WhatsappOnboarding {
 
     /**
      * Exchanges the code for the business token, subscribes Takodu to the account's webhooks, reads the number,
-     * and then requests the chat history (coexistence) or registers the number with the PIN (cloud API).
+     * requests the chat history (coexistence) or registers the number with the PIN (cloud API), and creates the
+     * notification templates the account does not have yet.
      *
      * @throws WhatsappSignupFailedException when Meta refuses a step
      */

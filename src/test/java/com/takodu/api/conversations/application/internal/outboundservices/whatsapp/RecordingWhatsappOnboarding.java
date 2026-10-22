@@ -4,14 +4,20 @@ import com.takodu.api.conversations.domain.exceptions.WhatsappSignupFailedExcept
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.model.valueobjects.EncryptedToken;
 import com.takodu.api.conversations.domain.model.valueobjects.LineMode;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
+import com.takodu.api.conversations.domain.model.valueobjects.TemplateStatus;
 import com.takodu.api.shared.infrastructure.crypto.TokenCipher;
 import jakarta.inject.Singleton;
 
+import java.util.EnumMap;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** The {@link WhatsappOnboarding} of every {@code @QuarkusTest}: accepts any signup and never calls Meta. */
+/**
+ * The {@link WhatsappOnboarding} of every {@code @QuarkusTest}: accepts any signup with every template approved, and
+ * never calls Meta. A test changes a template's status with the recorded {@code template-status} webhook.
+ */
 @Singleton
 public class RecordingWhatsappOnboarding implements WhatsappOnboarding {
     public static final String DISPLAY_PHONE = "+51 1 555 0100";
@@ -29,7 +35,10 @@ public class RecordingWhatsappOnboarding implements WhatsappOnboarding {
     public OnboardedNumber onboard(String code, String wabaId, String phoneNumberId, LineMode mode, String pin) {
         if (failNext.getAndSet(false)) throw new WhatsappSignupFailedException("Meta refused exchanging the signup code");
         onboardedPhoneNumberIds.add(phoneNumberId);
-        return new OnboardedNumber(DISPLAY_PHONE, new EncryptedToken(tokenCipher.encrypt("token-" + phoneNumberId)));
+        var templates = new EnumMap<NotificationTemplate, TemplateStatus>(NotificationTemplate.class);
+        for (var template : NotificationTemplate.values()) templates.put(template, TemplateStatus.APPROVED);
+        return new OnboardedNumber(DISPLAY_PHONE, new EncryptedToken(tokenCipher.encrypt("token-" + phoneNumberId)),
+                templates);
     }
 
     @Override
