@@ -7,11 +7,11 @@
 #
 # Then, build the image with:
 #
-# docker build -f src/main/docker/Dockerfile.jvm -t quarkus/code-with-quarkus-jvm .
+# docker build -f src/main/docker/Dockerfile.jvm -t pibble .
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/code-with-quarkus-jvm
+# docker run -i --rm -p 8080:8080 pibble
 #
 # If you want to include the debug port into your docker image
 # you will have to expose the debug port (default 5005 being the default) like this :  EXPOSE 8080 5005.
@@ -20,7 +20,7 @@
 #
 # Then run the container using :
 #
-# docker run -i --rm -p 8080:8080 quarkus/code-with-quarkus-jvm
+# docker run -i --rm -p 8080:8080 pibble
 #
 # This image uses the `run-java.sh` script to run the application.
 # This scripts computes the command line to execute your Java application, and
@@ -91,8 +91,15 @@ COPY --chown=185 target/quarkus-app/*.jar /deployments/
 COPY --chown=185 target/quarkus-app/app/ /deployments/app/
 COPY --chown=185 target/quarkus-app/quarkus/ /deployments/quarkus/
 
-EXPOSE 8080
+# Customers' media lives on a volume. The directory belongs to the app user, so a new named volume mounted here
+# starts writable; MediaVolumeHealthCheck reports it unready otherwise.
+USER root
+RUN mkdir -p /deployments/media && chown 185 /deployments/media
 USER 185
+ENV MEDIA_DIR=/deployments/media
+VOLUME /deployments/media
+
+EXPOSE 8080
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
 

@@ -1,11 +1,13 @@
 package com.takodu.api.shared.interfaces.rest.errors;
 
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
+import com.takodu.api.shared.domain.exceptions.AuthenticationFailedException;
 import com.takodu.api.shared.domain.exceptions.BusinessRuleViolationException;
 import com.takodu.api.shared.domain.exceptions.ConflictException;
 import com.takodu.api.shared.domain.exceptions.DomainException;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
 import com.takodu.api.shared.domain.exceptions.ResourceNotFoundException;
+import com.takodu.api.shared.domain.exceptions.TooManyRequestsException;
 import com.takodu.api.shared.interfaces.rest.resources.ErrorResource;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -23,16 +25,18 @@ public class GlobalExceptionMapper {
      * Maps a domain failure to its HTTP status.
      *
      * @param exception the failure thrown by a domain or application class
-     * @return 402, 403, 404, 409 or 422 with the exception's code and message
+     * @return 401, 402, 403, 404, 409, 422 or 429 with the exception's code and message
      */
     @ServerExceptionMapper
     public Response toResponse(DomainException exception) {
         int status = switch (exception) {
+            case AuthenticationFailedException e -> 401;
             case PlanInactiveException e -> 402;
             case AccessDeniedException e -> 403;
             case ResourceNotFoundException e -> 404;
             case ConflictException e -> 409;
             case BusinessRuleViolationException e -> 422;
+            case TooManyRequestsException e -> 429;
             default -> 500;
         };
         return error(status, exception.code(), exception.getMessage());

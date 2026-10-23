@@ -5,18 +5,19 @@ description: How bounded contexts in the pibble Quarkus backend talk to each oth
 
 # Integrating pibble bounded contexts
 
-Two mechanisms exist, and nothing else crosses a context boundary. `ArchitectureTest` rejects any other dependency between contexts. Package names below are relative to `com.takodu.api`.
+Three mechanisms exist, and nothing else crosses a context boundary. `ArchitectureTest` rejects any other dependency between contexts. Package names below are relative to `com.takodu.api`.
 
 | Need | Mechanism | Direction |
 |---|---|---|
 | Ask another context for data, or tell it to do something now and get the result | **ACL facade** call | Consumer depends on supplier |
 | Let other contexts react to a fact that already happened | **Integration event** | Listener depends on publisher; publisher knows no listener |
+| A lower context needs a higher one's answer | **Provider** in the lower `interfaces.acl` ([decision](../../../docs/decisions/implemented/2026-10-21-lower-contexts-ask-up-through-providers.md)) | Higher implements it; a `@DefaultBean` answers until then |
 
 Choose the facade when the caller needs the answer to continue. Choose an event when the caller is done and others only follow up.
 
 ## The context map
 
-A context may depend only on the contexts in its "May depend on" column in [docs/architecture.md](../../../docs/architecture.md), mirrored by `ArchitectureTest.ALLOWED_DEPENDENCIES`. Calls go down (`assistant → booking → organization → identity`); when a lower context must trigger work in a higher one, it publishes an event that the higher one observes. `booking` never calls `conversations`: `conversations` listens to `AppointmentBookedIntegrationEvent`. Adding an edge to the map is a design change: update the table, the map and a decision record in the same commit, and never add an edge that creates a cycle.
+A context may depend only on the contexts in its "May depend on" column in [docs/architecture.md](../../../docs/architecture.md), mirrored by `ArchitectureTest.ALLOWED_DEPENDENCIES`. Calls go down (`assistant → booking → organization → iam`); when a lower context must trigger work in a higher one, it publishes an event that the higher one observes. `booking` never calls `conversations`: `conversations` listens to `AppointmentBookedIntegrationEvent`. Adding an edge to the map is a design change: update the table, the map and a decision record in the same commit, and never add an edge that creates a cycle.
 
 ## ACL facade (supplier side)
 

@@ -1,5 +1,7 @@
 package com.takodu.api.shared.domain.exceptions;
 
+import java.util.Locale;
+
 /**
  * Base type for expected business failures.
  *
@@ -17,6 +19,14 @@ public abstract class DomainException extends RuntimeException {
     protected DomainException(String code, String message) {
         super(message);
         this.code = code;
+    }
+
+    /**
+     * @param words a name such as {@code "Time block"}
+     * @return the words in upper snake case, such as {@code TIME_BLOCK}
+     */
+    protected static String codeOf(String words) {
+        return words.strip().replace(' ', '_').toUpperCase(Locale.ROOT);
     }
 
     /**

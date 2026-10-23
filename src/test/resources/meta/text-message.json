@@ -1,0 +1,21 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [{
+    "id": "${WABA_ID}",
+    "changes": [{
+      "value": {
+        "messaging_product": "whatsapp",
+        "metadata": {"display_phone_number": "15550783881", "phone_number_id": "${PHONE_NUMBER_ID}"},
+        "contacts": [{"profile": {"name": "Rosa Quispe"}, "wa_id": "${WA_ID}"}],
+        "messages": [{
+          "from": "${WA_ID}",
+          "id": "${WAMID}",
+          "timestamp": "${TIMESTAMP}",
+          "type": "text",
+          "text": {"body": "${BODY}"}
+        }]
+      },
+      "field": "messages"
+    }]
+  }]
+}

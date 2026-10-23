@@ -2,6 +2,7 @@ package com.takodu.api.architecture;
 
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -10,11 +11,16 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 /**
@@ -29,11 +35,16 @@ class ArchitectureTest {
 
     static final String BASE = "com.takodu.api";
 
+    /** Parameter types that scope a repository query to one organization. */
+    static final Set<String> TENANT_SCOPES = Set.of(
+            BASE + ".shared.domain.model.valueobjects.OrganizationId",
+            BASE + ".shared.domain.model.valueobjects.EstablishmentId");
+
     /** Context map: each context and the contexts it may call (facade) or listen to (events). Calls go down. */
     static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
             "shared", Set.of(),
-            "identity", Set.of(),
-            "organization", Set.of("identity"),
+            "iam", Set.of(),
+            "organization", Set.of("iam"),
             "customers", Set.of(),
             "booking", Set.of("organization", "customers"),
             "conversations", Set.of("organization", "customers", "booking"),
@@ -84,6 +95,42 @@ class ArchitectureTest {
     static final ArchRule no_cycles_between_contexts = slices()
             .matching(BASE + ".(*)..")
             .should().beFreeOfCycles();
+
+    @ArchTest
+    static final ArchRule aggregates_have_no_setters = noMethods()
+            .that().areDeclaredInClassesThat().resideInAnyPackage("..domain.model.aggregates..", "..domain.model.entities..")
+            .and().arePublic()
+            .should().haveNameMatching("set[A-Z].*")
+            .because("every state change is a method with a business name that checks its invariant");
+
+    @ArchTest
+    static final ArchRule aggregates_have_no_public_mutable_fields = noFields()
+            .that().areDeclaredInClassesThat().resideInAnyPackage("..domain.model.aggregates..", "..domain.model.entities..")
+            .and().arePublic()
+            .should().notBeFinal()
+            .because("state is changed only through the aggregate's methods");
+
+    @ArchTest
+    static final ArchRule repository_ports_are_scoped_by_organization = methods()
+            .that().areDeclaredInClassesThat().resideInAPackage("..domain.repositories..")
+            .and().areDeclaredInClassesThat().areInterfaces()
+            .and().areDeclaredInClassesThat().areNotAnnotations()
+            .and().areDeclaredInClassesThat().resideOutsideOfPackage(BASE + ".iam..")
+            .should(beScopedByOrganization())
+            .because("an id from another organization must find nothing (takodu-tenancy)");
+
+    @ArchTest
+    static final ArchRule assistant_tools_take_no_ids = methods()
+            .that().areAnnotatedWith("dev.langchain4j.agent.tool.Tool")
+            .should(takeNoIdentifiers())
+            .because("TurnScope binds the tenant before the model runs; the model never chooses an id (takodu-assistant)");
+
+    @ArchTest
+    static final ArchRule post_endpoints_take_an_idempotency_key = methods()
+            .that().areAnnotatedWith("jakarta.ws.rs.POST")
+            .and().areDeclaredInClassesThat().resideInAPackage("..interfaces.rest..")
+            .should(takeAnIdempotencyKeyHeader())
+            .because("a retried tap must have one effect (docs/decisions/implemented/2026-10-20-idempotency-keys-on-retried-requests.md)");
 
     @ArchTest
     static final ArchRule controllers_are_named_controller = classes()
@@ -166,6 +213,67 @@ class ArchitectureTest {
                         events.add(SimpleConditionEvent.violated(dependency, dependency.getDescription()
                                 + " (context map: " + from + " may not depend on " + to + ")"));
                     }
+                }
+            }
+        };
+    }
+
+    /**
+     * {@code iam} is exempt: users exist above organizations, and its lookups are scoped by the user or by the
+     * secret the caller presents. A repository method takes an {@code OrganizationId}, an {@code EstablishmentId} or an aggregate (which
+     * carries its organization), or is marked {@code @CrossTenant} for a job or webhook.
+     */
+    private static ArchCondition<JavaMethod> beScopedByOrganization() {
+        return new ArchCondition<>("take an OrganizationId, an EstablishmentId or an aggregate, or be @CrossTenant") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                if (method.isAnnotatedWith(BASE + ".shared.domain.repositories.CrossTenant")) {
+                    return;
+                }
+                boolean scoped = method.getRawParameterTypes().stream().anyMatch(type ->
+                        TENANT_SCOPES.contains(type.getName()) || type.getPackageName().contains(".domain.model.aggregates"));
+                if (!scoped) {
+                    events.add(SimpleConditionEvent.violated(method, method.getFullName()
+                            + " is not scoped by organization; add an OrganizationId parameter or @CrossTenant"));
+                }
+            }
+        };
+    }
+
+    /** Neither a UUID or {@code *Id} type nor a parameter named {@code *Id} or {@code *Ids}. */
+    private static ArchCondition<JavaMethod> takeNoIdentifiers() {
+        return new ArchCondition<>("take no identifier parameters") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                boolean idType = method.getRawParameterTypes().stream().anyMatch(type ->
+                        type.isEquivalentTo(UUID.class) || type.getSimpleName().endsWith("Id"));
+                boolean idName = Arrays.stream(method.reflect().getParameters())
+                        .anyMatch(parameter -> parameter.getName().matches(".*(Id|Ids|ID)$"));
+                if (idType || idName) {
+                    events.add(SimpleConditionEvent.violated(method, method.getFullName()
+                            + " takes an identifier; take a name, a local date or a list position instead"));
+                }
+            }
+        };
+    }
+
+    /** A {@code @HeaderParam("Idempotency-Key") UUID} parameter, or {@code @WithoutIdempotencyKey} on the method. */
+    private static ArchCondition<JavaMethod> takeAnIdempotencyKeyHeader() {
+        return new ArchCondition<>("take @HeaderParam(\"Idempotency-Key\") UUID or be @WithoutIdempotencyKey") {
+            @Override
+            public void check(JavaMethod method, ConditionEvents events) {
+                if (method.isAnnotatedWith(BASE + ".shared.interfaces.rest.idempotency.WithoutIdempotencyKey")) {
+                    return;
+                }
+                boolean hasKey = method.getParameters().stream().anyMatch(parameter ->
+                        parameter.getRawType().isEquivalentTo(UUID.class)
+                                && parameter.tryGetAnnotationOfType("jakarta.ws.rs.HeaderParam")
+                                .flatMap(header -> header.get("value"))
+                                .filter("Idempotency-Key"::equals)
+                                .isPresent());
+                if (!hasKey) {
+                    events.add(SimpleConditionEvent.violated(method, method.getFullName()
+                            + " is a POST without @HeaderParam(\"Idempotency-Key\") UUID or @WithoutIdempotencyKey"));
                 }
             }
         };

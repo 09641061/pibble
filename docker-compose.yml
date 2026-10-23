@@ -1,0 +1,49 @@
+# Production-like run: the app image, PostgreSQL and the media volume. Settings come from .env (see .env.example).
+#   ./mvnw package -DskipTests && docker compose up --build
+# The JWT key pair is read from ./keys (privateKey.pem, publicKey.pem), readable by the app user (uid 185).
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-pibble}
+      POSTGRES_USER: ${DATABASE_USER:?set DATABASE_USER in .env}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?set DATABASE_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: src/main/docker/Dockerfile.jvm
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_HOST: db
+      DATABASE_PORT: "5432"
+      MEDIA_DIR: /deployments/media
+      JWT_PRIVATE_KEY_LOCATION: /deployments/keys/privateKey.pem
+      JWT_PUBLIC_KEY_LOCATION: /deployments/keys/publicKey.pem
+    volumes:
+      - media:/deployments/media
+      - ./keys:/deployments/keys:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Longer than quarkus.shutdown.timeout, so requests finish before Docker kills the process.
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready || exit 1"]
+      interval: 10s
+      start_period: 60s
+      retries: 3
+
+volumes:
+  db-data:
+  media:

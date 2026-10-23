@@ -249,10 +249,10 @@ public class CustomerQueryServiceImpl implements CustomerQueryService {
 }
 ```
 
-An outbound port to an external system; its implementation lives in `identity.infrastructure.resend.ResendEmailSender`.
+An outbound port to an external system; its implementation lives in `iam.infrastructure.resend.ResendEmailSender`.
 
 ```java
-package com.takodu.api.identity.application.internal.outboundservices.email;
+package com.takodu.api.iam.application.internal.outboundservices.email;
 
 public interface EmailSender {
     void sendLoginCode(Email to, String code);
@@ -527,7 +527,7 @@ class CustomerTest {
 }
 ```
 
-Endpoint tests use `@QuarkusTest` (Dev Services starts PostgreSQL in Docker) and assert the status and the error `code`. `TestTenants` in `src/test/java/com/takodu/api/shared/testing` creates a user, an organization and a membership with the given role and returns an authenticated request specification with `X-Organization-Id`.
+Endpoint tests use `@QuarkusTest` (Dev Services starts PostgreSQL in Docker) and assert the status and the error `code`. `TestTenants` in `src/test/java/com/takodu/api/shared/testing` creates a user, an organization and a membership with the given role through the real endpoints and returns a `TestTenant`, whose `spec()` carries the access token and `X-Organization-Id`.
 
 ```java
 package com.takodu.api.customers.interfaces.rest;
@@ -539,10 +539,10 @@ class CustomersControllerTest {
         var owner = TestTenants.owner();
         var key = UUID.randomUUID().toString();
         var body = Map.of("phone", "+51987654321", "name", "Ana");
-        String id = given().spec(owner).header("Idempotency-Key", key).contentType(ContentType.JSON).body(body)
+        String id = given().spec(owner.spec()).header("Idempotency-Key", key).contentType(ContentType.JSON).body(body)
                 .post("/api/v1/customers").then().statusCode(201).extract().path("id");
 
-        given().spec(owner).header("Idempotency-Key", key).contentType(ContentType.JSON).body(body)
+        given().spec(owner.spec()).header("Idempotency-Key", key).contentType(ContentType.JSON).body(body)
                 .post("/api/v1/customers")
                 .then().statusCode(201).body("id", equalTo(id));
     }
@@ -551,10 +551,10 @@ class CustomersControllerTest {
     void samePhoneWithANewKeyReturns409() {
         var owner = TestTenants.owner();
         var body = Map.of("phone", "+51987654322");
-        given().spec(owner).header("Idempotency-Key", UUID.randomUUID().toString()).contentType(ContentType.JSON)
+        given().spec(owner.spec()).header("Idempotency-Key", UUID.randomUUID().toString()).contentType(ContentType.JSON)
                 .body(body).post("/api/v1/customers").then().statusCode(201);
 
-        given().spec(owner).header("Idempotency-Key", UUID.randomUUID().toString()).contentType(ContentType.JSON)
+        given().spec(owner.spec()).header("Idempotency-Key", UUID.randomUUID().toString()).contentType(ContentType.JSON)
                 .body(body).post("/api/v1/customers")
                 .then().statusCode(409).body("code", equalTo("CUSTOMER_CONFLICT"));
     }
@@ -562,11 +562,11 @@ class CustomersControllerTest {
     @Test
     void staffCannotDeleteCustomers() {
         var tenant = TestTenants.owner();
-        var id = given().spec(tenant).header("Idempotency-Key", UUID.randomUUID().toString())
+        var id = given().spec(tenant.spec()).header("Idempotency-Key", UUID.randomUUID().toString())
                 .contentType(ContentType.JSON).body(Map.of("phone", "+51911111111"))
                 .post("/api/v1/customers").then().statusCode(201).extract().path("id");
 
-        given().spec(TestTenants.staffOf(tenant)).delete("/api/v1/customers/" + id)
+        given().spec(TestTenants.staffOf(tenant).spec()).delete("/api/v1/customers/" + id)
                 .then().statusCode(403).body("code", equalTo("ACCESS_DENIED"));
     }
 }

@@ -10,6 +10,15 @@ public class ConflictException extends DomainException {
      * @param message what conflicts
      */
     public ConflictException(String resource, String message) {
-        super(resource.toUpperCase() + "_CONFLICT", message);
+        super(codeOf(resource) + "_CONFLICT", message);
+    }
+
+    /**
+     * @param resource what collides, for example {@code "Slot"}
+     * @param condition the state it is in, for example {@code "unavailable"}; produces code {@code SLOT_UNAVAILABLE}
+     * @param message what conflicts
+     */
+    protected ConflictException(String resource, String condition, String message) {
+        super(codeOf(resource + " " + condition), message);
     }
 }

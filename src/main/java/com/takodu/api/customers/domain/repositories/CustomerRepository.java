@@ -1,0 +1,49 @@
+package com.takodu.api.customers.domain.repositories;
+
+import com.takodu.api.customers.domain.model.aggregates.Customer;
+import com.takodu.api.customers.domain.model.valueobjects.PhoneNumber;
+import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
+import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
+import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+public interface CustomerRepository {
+    /** @return the customer unless deleted */
+    Optional<Customer> findActiveById(OrganizationId organizationId, CustomerId customerId);
+
+    /** @return the customer, deleted or not */
+    Optional<Customer> findById(OrganizationId organizationId, CustomerId customerId);
+
+    /** @return the customers found, deleted or not; ids of other organizations are skipped */
+    List<Customer> findByIds(OrganizationId organizationId, Collection<CustomerId> customerIds);
+
+    Optional<Customer> findActiveByPhone(OrganizationId organizationId, PhoneNumber phone);
+
+    /**
+     * @param text matched, ignoring case, inside the name and the WhatsApp name, and its digits inside the phone;
+     *        blank matches every active customer
+     * @return active customers by display name
+     */
+    List<Customer> search(OrganizationId organizationId, String text, int offset, int limit);
+
+    Optional<Customer> findByIdempotencyKey(OrganizationId organizationId, IdempotencyKey idempotencyKey);
+
+    /**
+     * @throws com.takodu.api.customers.domain.exceptions.CustomerAlreadyRegisteredException when another active
+     *         customer has the phone (C1)
+     * @throws com.takodu.api.shared.domain.exceptions.RequestInProgressException when a concurrent request with the
+     *         same key inserted first
+     */
+    Customer save(Customer customer);
+
+    /**
+     * C1, C2: inserts the customer unless an active customer already has its phone, without failing when a
+     * concurrent transaction inserts the same phone first.
+     *
+     * @return the inserted customer, or the active customer that has the phone
+     */
+    Customer addIfPhoneFree(Customer customer);
+}

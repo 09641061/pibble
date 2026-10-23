@@ -8,7 +8,7 @@ An expected failure (unknown customer, phone already registered, slot taken, clo
 
 ## Decision
 
-Expected failures are domain exceptions. `shared.domain.exceptions` defines `DomainException` and its bases: `ResourceNotFoundException` (404), `ConflictException` (409), `BusinessRuleViolationException` (422), `AccessDeniedException` (403) and `PlanInactiveException` (402, rule O6). Each context declares its own exceptions in `<context>.domain.exceptions` extending a base. Value objects and commands throw `IllegalArgumentException` (400).
+Expected failures are domain exceptions. `shared.domain.exceptions` defines `DomainException` and its bases: `ResourceNotFoundException` (404), `ConflictException` (409), `BusinessRuleViolationException` (422), `AccessDeniedException` (403), `PlanInactiveException` (402, rule O6), `AuthenticationFailedException` (401, a wrong or expired sign-in code or refresh token) and `TooManyRequestsException` (429, a rate limit from a business rule such as I3). Each context declares its own exceptions in `<context>.domain.exceptions` extending a base. Value objects and commands throw `IllegalArgumentException` (400).
 
 `shared.interfaces.rest.errors.GlobalExceptionMapper` is the only class that translates these types to HTTP, with the body `ErrorResource(code, message)`. Unexpected exceptions are not mapped: Quarkus logs them and answers 500. Database constraint violations are not mapped either; the repository adapter that triggers them translates them into a context exception. `GlobalExceptionMapperTest` pins the mapping.
 

@@ -1,0 +1,105 @@
+package com.takodu.api.conversations.application.internal.commandservices;
+
+import com.takodu.api.conversations.application.commandservices.ConversationCommandService;
+import com.takodu.api.conversations.application.internal.outboundservices.acl.ExternalOrganizationService;
+import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundException;
+import com.takodu.api.conversations.domain.model.aggregates.Conversation;
+import com.takodu.api.conversations.domain.model.commands.AssignConversationCommand;
+import com.takodu.api.conversations.domain.model.commands.HandOffConversationCommand;
+import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
+import com.takodu.api.conversations.domain.model.commands.PauseAssistantCommand;
+import com.takodu.api.conversations.domain.model.commands.ResumeAssistantCommand;
+import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
+import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.repositories.ConversationRepository;
+import com.takodu.api.shared.application.tenancy.AccessPolicy;
+import com.takodu.api.shared.application.tenancy.Action;
+import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
+import jakarta.transaction.Transactional;
+
+import java.time.Clock;
+
+@ApplicationScoped
+public class ConversationCommandServiceImpl implements ConversationCommandService {
+    private final ConversationRepository conversationRepository;
+    private final ExternalOrganizationService externalOrganizationService;
+    private final AccessPolicy accessPolicy;
+    private final Event<ConversationChangedEvent> conversationChanged;
+    private final Clock clock;
+
+    public ConversationCommandServiceImpl(ConversationRepository conversationRepository,
+                                          ExternalOrganizationService externalOrganizationService,
+                                          AccessPolicy accessPolicy, Event<ConversationChangedEvent> conversationChanged,
+                                          Clock clock) {
+        this.conversationRepository = conversationRepository;
+        this.externalOrganizationService = externalOrganizationService;
+        this.accessPolicy = accessPolicy;
+        this.conversationChanged = conversationChanged;
+        this.clock = clock;
+    }
+
+    @Override
+    @Transactional
+    public Conversation handle(MarkConversationReadCommand command) {
+        var conversation = lock(command.organizationId(), command.conversationId());
+        conversation.markRead();
+        return save(conversation);
+    }
+
+    @Override
+    @Transactional
+    public Conversation handle(AssignConversationCommand command) {
+        var conversation = lock(command.organizationId(), command.conversationId());
+        if (command.memberId() != null)
+            externalOrganizationService.requireMemberWorksAt(command.organizationId(), command.memberId(),
+                    conversation.getEstablishmentId());
+        conversation.assignTo(command.memberId());
+        return save(conversation);
+    }
+
+    @Override
+    @Transactional
+    public Conversation handle(PauseAssistantCommand command) {
+        var conversation = lock(command.organizationId(), command.conversationId());
+        if (conversation.alreadyApplied(command.idempotencyKey())) return conversation;
+        conversation.pauseAssistant(command.pausedBy(), clock.instant(), command.idempotencyKey());
+        return save(conversation);
+    }
+
+    @Override
+    @Transactional
+    public Conversation handle(ResumeAssistantCommand command) {
+        var conversation = lock(command.organizationId(), command.conversationId());
+        if (conversation.alreadyApplied(command.idempotencyKey())) return conversation;
+        conversation.resumeAssistant(command.idempotencyKey());
+        return save(conversation);
+    }
+
+    @Override
+    @Transactional
+    public Conversation handle(HandOffConversationCommand command) {
+        var conversation = conversationRepository.lockById(command.organizationId(), command.conversationId())
+                .orElseThrow(() -> new ConversationNotFoundException(command.conversationId()));
+        conversation.handOff(command.summary(), clock.instant());
+        return save(conversation);
+    }
+
+    /** Other members' inboxes follow the change (W8, W9, A3). */
+    private Conversation save(Conversation conversation) {
+        var saved = conversationRepository.save(conversation);
+        conversationChanged.fire(new ConversationChangedEvent(saved.getOrganizationId(), saved.getEstablishmentId(),
+                saved.getId()));
+        return saved;
+    }
+
+    /** Checks the caller before loading, then their establishment once the conversation names it (W7). */
+    private Conversation lock(OrganizationId organizationId, ConversationId conversationId) {
+        accessPolicy.require(Action.REPLY_IN_INBOX);
+        var conversation = conversationRepository.lockById(organizationId, conversationId)
+                .orElseThrow(() -> new ConversationNotFoundException(conversationId));
+        accessPolicy.requireEstablishment(conversation.getEstablishmentId());
+        return conversation;
+    }
+}
