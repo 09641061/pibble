@@ -45,26 +45,13 @@ public class LocalMediaStorage implements MediaStorage {
 
     @Override
     public InputStream open(String path) {
-        try {
-            return Files.newInputStream(resolve(path));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    @Override
-    public void delete(String path) {
-        try {
-            Files.deleteIfExists(resolve(path));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private Path resolve(String path) {
         var file = root.resolve(path).normalize();
         if (!file.startsWith(root)) throw new IllegalArgumentException("The media path leaves the media directory");
-        return file;
+        try {
+            return Files.newInputStream(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     /** A partial file is left only when the copy failed; after the move it no longer exists. */

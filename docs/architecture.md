@@ -11,7 +11,7 @@ Each context is a direct subpackage of `com.takodu.api`; `shared` is the kernel 
 | `shared` | kernel | — | — | — |
 | `iam` | generic | `User`, `LoginCode`, `Session` | — | — |
 | `organization` | supporting | `Organization`, `Establishment`, `Member`, `Service` | `iam` | — |
-| `customers` | supporting | `Customer` | — | `CustomerDeleted` |
+| `customers` | supporting | `Customer` | — | — |
 | `booking` | core | `Appointment`, `TimeBlock` | `organization`, `customers` | `AppointmentBooked`, `AppointmentRescheduled`, `AppointmentCancelled` |
 | `conversations` | core | `WhatsappLine`, `Conversation`, `Message`, `ScheduledMessage` | `organization`, `customers`, `booking` (events, [templates](decisions/implemented/2026-10-22-staff-templates-read-appointments-from-booking.md)) | `InboundMessageReceived` |
 | `assistant` | core | `AssistantSettings`, `AssistantTurn` | `organization`, `customers`, `booking`, `conversations` | — |
@@ -41,17 +41,16 @@ Dependencies go `interfaces → application → domain ← infrastructure`. The 
 | Event | Listener | Phase | What the listener does |
 |---|---|---|---|
 | `AppointmentBooked`, `AppointmentRescheduled`, `AppointmentCancelled` | `conversations` | in transaction | Schedules, moves or cancels confirmation and reminder rows |
-| `CustomerDeleted` | `conversations` | in transaction | Marks the customer's media for the retention job |
 | `InboundMessageReceived` | `assistant` | in transaction | Enqueues an assistant turn when the assistant may answer |
 | `InboundMessageReceived` | `assistant` | after commit | Wakes the turn worker |
 
-In-transaction listeners write only their own tables, so a failure rolls back everything. After-commit listeners only wake work up; a polling job recovers anything lost. `ConversationChanged`, feeding the SSE inbox stream, is a CDI event inside `conversations`. Event names above omit the `IntegrationEvent` suffix. The detail and templates are in [takodu-context-integration](../.agents/skills/takodu-context-integration/SKILL.md).
+In-transaction listeners write only their own tables, so a failure rolls back everything. After-commit listeners only wake work up; a polling job recovers anything lost. Inside `conversations`, an after-commit `ConversationChanged` CDI event feeds the SSE inbox stream; it is not an integration event. Event names above omit the `IntegrationEvent` suffix. The detail and templates are in [takodu-context-integration](../.agents/skills/takodu-context-integration/SKILL.md).
 
 ## Requests, tenancy and background work
 
 A request passes JWT verification, then `organization`'s `TenantFilter` loads the caller's active membership for the `X-Organization-Id` header into `TenantContext` or answers 403. `/internal/v1` is for the Takodu team: `iam`'s `OperatorFilter` admits only platform operators ([decision](decisions/implemented/2026-10-23-takodu-team-as-platform-operators.md)). Command services check `AccessPolicy` before loading the aggregate. Webhooks and jobs have no `TenantContext`; they derive the organization from their data. The rules are in the [tenancy decision](decisions/implemented/2026-10-19-tenancy-and-fixed-roles.md).
 
-Jobs claim rows with `SELECT … FOR UPDATE SKIP LOCKED`; outgoing messages, media and assistant turns are rows ([decision](decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md)). Every external system (Meta, the LLM provider, Resend) sits behind a port in `application.internal.outboundservices`.
+Scheduled jobs use `quarkus-scheduler` and claim rows with `SELECT … FOR UPDATE SKIP LOCKED`; outgoing WhatsApp messages and assistant turns are rows in their context's tables ([decision](decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md)). Every external system (Meta, the LLM provider, Resend) sits behind a port in `application.internal.outboundservices`.
 
 ## Persistence
 
@@ -71,4 +70,4 @@ Each table belongs to one context; foreign keys across contexts are allowed, but
 | `TooManyRequestsException` | 429 |
 | Anything else | 500 |
 
-The body is `{"code": "...", "message": "..."}`. Bean Validation rejections are 400 in Quarkus's violations format. The reason is in the [errors decision](decisions/implemented/2026-10-19-errors-with-exception-mapper.md).
+The body is `{"code": "...", "message": "..."}`. Bean Validation rejections are also 400, in Quarkus's own violations format. The reason is in the [errors decision](decisions/implemented/2026-10-19-errors-with-exception-mapper.md).

@@ -12,13 +12,4 @@ public class ResourceNotFoundException extends DomainException {
     public ResourceNotFoundException(String resource, Object identifier) {
         super(codeOf(resource) + "_NOT_FOUND", "%s not found: %s".formatted(resource, identifier));
     }
-
-    /**
-     * @param resource what is missing, for example {@code "Media"}
-     * @param condition why, for example {@code "removed"}; produces code {@code MEDIA_REMOVED}
-     * @param message what happened to it
-     */
-    protected ResourceNotFoundException(String resource, String condition, String message) {
-        super(codeOf(resource + " " + condition), message);
-    }
 }

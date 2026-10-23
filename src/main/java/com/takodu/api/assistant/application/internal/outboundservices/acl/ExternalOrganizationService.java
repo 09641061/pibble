@@ -1,7 +1,6 @@
 package com.takodu.api.assistant.application.internal.outboundservices.acl;
 
 import com.takodu.api.assistant.domain.exceptions.EstablishmentNotFoundException;
-import com.takodu.api.assistant.domain.exceptions.OrganizationNotFoundException;
 import com.takodu.api.assistant.domain.model.valueobjects.EstablishmentProfile;
 import com.takodu.api.assistant.domain.model.valueobjects.OfferedService;
 import com.takodu.api.assistant.domain.model.valueobjects.OpeningRange;
@@ -55,11 +54,5 @@ public class ExternalOrganizationService {
                                 range.closesAt()))
                         .toList(),
                 view.archived(), view.planActive());
-    }
-
-    /** @throws OrganizationNotFoundException when no organization has the id */
-    public String fetchOrganizationName(OrganizationId organizationId) {
-        return organizationContextFacade.fetchOrganizationName(organizationId.value())
-                .orElseThrow(() -> new OrganizationNotFoundException(organizationId));
     }
 }

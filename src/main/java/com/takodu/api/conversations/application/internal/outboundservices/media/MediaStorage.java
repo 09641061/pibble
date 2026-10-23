@@ -23,12 +23,4 @@ public interface MediaStorage {
      * @throws UncheckedIOException when the file is missing or unreadable
      */
     InputStream open(String path);
-
-    /**
-     * Deletes the file; a file already gone is not an error, so a retried removal succeeds.
-     *
-     * @param path a path {@link #store} returned
-     * @throws UncheckedIOException when the disk refuses
-     */
-    void delete(String path);
 }

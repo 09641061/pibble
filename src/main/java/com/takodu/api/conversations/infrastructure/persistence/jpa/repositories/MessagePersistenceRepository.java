@@ -64,34 +64,6 @@ public class MessagePersistenceRepository implements PanacheRepositoryBase<Messa
         return claimed.stream().findFirst();
     }
 
-    /** Uses {@code messages_media_retention_idx}; {@code SKIP LOCKED} leaves a download in progress alone. */
-    public Optional<MessagePersistenceEntity> claimNextMediaRemoval(Instant expiredBefore) {
-        @SuppressWarnings("unchecked")
-        List<MessagePersistenceEntity> claimed = getEntityManager().createNativeQuery("""
-                        SELECT * FROM messages
-                        WHERE media_status = 'removing'
-                           OR (media_status IN ('pending', 'ready', 'failed') AND occurred_at < :expiredBefore)
-                        ORDER BY media_status = 'removing' DESC, occurred_at, id
-                        LIMIT 1
-                        FOR UPDATE SKIP LOCKED""", MessagePersistenceEntity.class)
-                .setParameter("expiredBefore", expiredBefore)
-                .getResultList();
-        return claimed.stream().findFirst();
-    }
-
-    public List<MessagePersistenceEntity> findMediaToRemove(UUID organizationId, UUID customerId) {
-        @SuppressWarnings("unchecked")
-        List<MessagePersistenceEntity> found = getEntityManager().createNativeQuery("""
-                        SELECT m.* FROM messages m JOIN conversations c ON c.id = m.conversation_id
-                        WHERE m.organization_id = :organizationId AND c.customer_id = :customerId
-                          AND m.media_status IN ('pending', 'ready', 'failed')
-                        FOR UPDATE OF m""", MessagePersistenceEntity.class)
-                .setParameter("organizationId", organizationId)
-                .setParameter("customerId", customerId)
-                .getResultList();
-        return found;
-    }
-
     public Optional<MessagePersistenceEntity> lockByWamid(String wamid) {
         return find("wamid", wamid).withLock(LockModeType.PESSIMISTIC_WRITE).firstResultOptional();
     }

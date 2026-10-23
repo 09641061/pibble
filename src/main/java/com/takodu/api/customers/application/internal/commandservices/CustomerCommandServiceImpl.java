@@ -9,13 +9,11 @@ import com.takodu.api.customers.domain.model.commands.RecordWhatsappContactComma
 import com.takodu.api.customers.domain.model.commands.RegisterCustomerCommand;
 import com.takodu.api.customers.domain.model.commands.UpdateCustomerCommand;
 import com.takodu.api.customers.domain.repositories.CustomerRepository;
-import com.takodu.api.customers.interfaces.events.CustomerDeletedIntegrationEvent;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
 import com.takodu.api.shared.application.tenancy.Action;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Event;
 import jakarta.transaction.Transactional;
 
 import java.time.Clock;
@@ -25,14 +23,11 @@ public class CustomerCommandServiceImpl implements CustomerCommandService {
     private final CustomerRepository customerRepository;
     private final AccessPolicy accessPolicy;
     private final Clock clock;
-    private final Event<CustomerDeletedIntegrationEvent> customerDeleted;
 
-    public CustomerCommandServiceImpl(CustomerRepository customerRepository, AccessPolicy accessPolicy, Clock clock,
-                                      Event<CustomerDeletedIntegrationEvent> customerDeleted) {
+    public CustomerCommandServiceImpl(CustomerRepository customerRepository, AccessPolicy accessPolicy, Clock clock) {
         this.customerRepository = customerRepository;
         this.accessPolicy = accessPolicy;
         this.clock = clock;
-        this.customerDeleted = customerDeleted;
     }
 
     @Override
@@ -63,8 +58,6 @@ public class CustomerCommandServiceImpl implements CustomerCommandService {
         var customer = load(command.organizationId(), command.customerId());
         customer.delete(clock.instant());
         customerRepository.save(customer);
-        customerDeleted.fire(new CustomerDeletedIntegrationEvent(command.organizationId().value(),
-                command.customerId().value()));
     }
 
     @Override
