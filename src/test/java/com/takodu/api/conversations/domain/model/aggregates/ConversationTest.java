@@ -5,6 +5,8 @@ import com.takodu.api.conversations.domain.model.valueobjects.LineMode;
 import com.takodu.api.conversations.domain.model.valueobjects.WhatsappLineId;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
+import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
+import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +17,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -106,6 +109,51 @@ class ConversationTest {
         assertEquals(1, conversation.getUnreadCount());
         assertFalse(conversation.isAssistantPaused(NOW.plusSeconds(5)));
         assertEquals(NOW.plusSeconds(5), conversation.getLastMessageAt());
+    }
+
+    @Test
+    void manualPauseLastsUntilResumedAndRecordsWhoPausedFirst() {
+        var conversation = start();
+        conversation.recordInbound(NOW);
+        var owner = new MemberId(UUID.randomUUID());
+
+        conversation.pauseAssistant(owner, NOW, new IdempotencyKey(UUID.randomUUID()));
+        conversation.pauseAssistant(new MemberId(UUID.randomUUID()), NOW.plusSeconds(5),
+                new IdempotencyKey(UUID.randomUUID()));
+
+        assertTrue(conversation.isAssistantPaused(NOW.plus(Duration.ofDays(30))));
+        assertEquals(owner, conversation.getManuallyPausedBy());
+        assertEquals(NOW, conversation.getManuallyPausedAt());
+        assertEquals(1, conversation.getUnreadCount());
+        assertFalse(conversation.isHandedOff());
+    }
+
+    @Test
+    void resumeClearsTheHumanPauseTheManualPauseAndAHandoff() {
+        var conversation = start();
+        conversation.recordInbound(NOW);
+        conversation.recordHumanOutbound(NOW);
+        conversation.pauseAssistant(new MemberId(UUID.randomUUID()), NOW, new IdempotencyKey(UUID.randomUUID()));
+        conversation.handOff("Pide hablar con una persona", NOW);
+
+        conversation.resumeAssistant(new IdempotencyKey(UUID.randomUUID()));
+
+        assertFalse(conversation.isAssistantPaused(NOW));
+        assertFalse(conversation.isManuallyPaused());
+        assertFalse(conversation.isHandedOff());
+        assertNull(conversation.getHandoffSummary());
+        assertNull(conversation.getAssistantPausedUntil());
+    }
+
+    @Test
+    void aKeyIsAppliedOnce() {
+        var conversation = start();
+        var key = new IdempotencyKey(UUID.randomUUID());
+
+        conversation.resumeAssistant(key);
+
+        assertTrue(conversation.alreadyApplied(key));
+        assertFalse(conversation.alreadyApplied(new IdempotencyKey(UUID.randomUUID())));
     }
 
     private static Conversation start() {

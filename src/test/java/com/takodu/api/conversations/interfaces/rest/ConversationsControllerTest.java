@@ -4,7 +4,10 @@ import com.takodu.api.conversations.TestWhatsapp;
 import com.takodu.api.shared.testing.TestSalon;
 import com.takodu.api.shared.testing.TestTenant;
 import com.takodu.api.shared.testing.TestTenants;
+import com.takodu.api.conversations.interfaces.acl.ConversationsContextFacade;
+import com.takodu.api.shared.infrastructure.time.TestClock;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import io.restassured.http.ContentType;
 import io.restassured.response.ValidatableResponse;
 import org.junit.jupiter.api.Test;
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -23,9 +27,16 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
 class ConversationsControllerTest {
+
+    @Inject
+    TestClock clock;
+
+    @Inject
+    ConversationsContextFacade conversations;
 
     @Test
     void inboxShowsNewestActivityFirstWithCustomerWindowAndUnread() {
@@ -119,9 +130,94 @@ class ConversationsControllerTest {
         assign(stranger, conversation, stranger.memberId()).statusCode(404);
     }
 
+    @Test
+    void staffPauseTheAssistantUntilResumedAndResumeClearsAHandoff() {
+        var salon = TestSalon.open();
+        var line = TestWhatsapp.connectLine(salon.owner(), salon.establishmentId());
+        var conversation = customerWrites(salon.owner(), salon.establishmentId(), line, newWaId(), Instant.now());
+        var staff = salon.hireStaff();
+        var key = UUID.randomUUID();
+
+        assistant(staff, conversation, "pause", key).statusCode(200)
+                .body("assistantPaused", equalTo(true))
+                .body("assistantPausedManually", equalTo(true))
+                .body("assistantPausedByMemberId", equalTo(staff.memberId().toString()))
+                .body("assistantPausedUntil", nullValue())
+                .body("assistantHandedOff", equalTo(false))
+                .body("unreadCount", equalTo(1));
+        assistant(salon.owner(), conversation, "pause", UUID.randomUUID()).statusCode(200)
+                .body("assistantPausedByMemberId", equalTo(staff.memberId().toString()));
+
+        conversations.handOff(salon.owner().organizationId(), conversation, "Pide hablar con una persona");
+        assistant(salon.owner(), conversation, "resume", UUID.randomUUID()).statusCode(200)
+                .body("assistantPaused", equalTo(false))
+                .body("assistantPausedManually", equalTo(false))
+                .body("assistantPausedByMemberId", nullValue())
+                .body("assistantHandedOff", equalTo(false))
+                .body("handoffSummary", nullValue());
+    }
+
+    @Test
+    void repeatedKeyReturnsTheSameResultOnBothEndpoints() {
+        var salon = TestSalon.open();
+        var line = TestWhatsapp.connectLine(salon.owner(), salon.establishmentId());
+        var conversation = customerWrites(salon.owner(), salon.establishmentId(), line, newWaId(), Instant.now());
+        var staff = salon.hireStaff();
+        var pause = UUID.randomUUID();
+        var resume = UUID.randomUUID();
+
+        var paused = assistant(staff, conversation, "pause", pause).statusCode(200).extract().asString();
+        assertEquals(paused, assistant(staff, conversation, "pause", pause).statusCode(200).extract().asString());
+
+        var resumed = assistant(staff, conversation, "resume", resume).statusCode(200).extract().asString();
+        assertEquals(resumed, assistant(staff, conversation, "resume", resume).statusCode(200).extract().asString());
+    }
+
+    @Test
+    void pauseAndResumeNeedAKeyAndWorkWhileThePlanIsInactive() {
+        var salon = TestSalon.open();
+        var line = TestWhatsapp.connectLine(salon.owner(), salon.establishmentId());
+        var conversation = customerWrites(salon.owner(), salon.establishmentId(), line, newWaId(), Instant.now());
+
+        given().spec(salon.owner().spec()).post("/api/v1/conversations/" + conversation + "/assistant/pause")
+                .then().statusCode(400);
+        clock.advance(Duration.ofDays(15));
+        try {
+            assistant(salon.owner(), conversation, "pause", UUID.randomUUID()).statusCode(200)
+                    .body("assistantPaused", equalTo(true));
+            assistant(salon.owner(), conversation, "resume", UUID.randomUUID()).statusCode(200)
+                    .body("assistantPaused", equalTo(false));
+        } finally {
+            clock.reset();
+        }
+    }
+
+    @Test
+    void onlyThoseWhoSeeTheInboxPauseOrResumeIt() {
+        var salon = TestSalon.open();
+        var surco = salon.openSecondEstablishment();
+        var line = TestWhatsapp.connectLine(salon.owner(), surco);
+        var conversation = customerWrites(salon.owner(), surco, line, newWaId(), Instant.now());
+        var staff = salon.hireStaff();
+        var stranger = TestTenants.owner();
+
+        for (var action : List.of("pause", "resume")) {
+            assistant(staff, conversation, action, UUID.randomUUID()).statusCode(403)
+                    .body("code", equalTo("ACCESS_DENIED"));
+            assistant(stranger, conversation, action, UUID.randomUUID()).statusCode(404)
+                    .body("code", equalTo("CONVERSATION_NOT_FOUND"));
+        }
+        assistant(TestTenants.managerOf(salon.owner()), conversation, "pause", UUID.randomUUID()).statusCode(200);
+    }
+
     static ValidatableResponse list(TestTenant tenant, UUID establishmentId, Map<String, Object> parameters) {
         return given().spec(tenant.spec()).queryParams(parameters)
                 .get("/api/v1/establishments/" + establishmentId + "/conversations").then();
+    }
+
+    private static ValidatableResponse assistant(TestTenant tenant, UUID conversationId, String action, UUID key) {
+        return given().spec(tenant.spec()).header("Idempotency-Key", key.toString())
+                .post("/api/v1/conversations/" + conversationId + "/assistant/" + action).then();
     }
 
     private static ValidatableResponse read(TestTenant tenant, UUID conversationId) {

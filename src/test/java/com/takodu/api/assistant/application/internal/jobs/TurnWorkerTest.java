@@ -9,6 +9,7 @@ import com.takodu.api.conversations.application.internal.jobs.OutboundMessageSen
 import com.takodu.api.conversations.application.internal.outboundservices.whatsapp.RecordingWhatsappGateway;
 import com.takodu.api.shared.infrastructure.time.TestClock;
 import com.takodu.api.shared.testing.TestSalon;
+import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -113,6 +114,44 @@ class TurnWorkerTest {
     }
 
     @Test
+    void shortChoicesGoAsButtonsAndATapIsTheNextMessageTheModelReads() {
+        customerSays("¿Tienen cita mañana para corte?");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(reply("¿A qué hora te acomoda?", "10:00", "10:30", "11:00"));
+        run();
+        assertEquals(List.of("buttons(¿A qué hora te acomoda?|10:00|10:30|11:00)"), gateway.sentTo(waId));
+
+        clock.advance(Duration.ofMinutes(1));
+        customerTaps("button-reply", "10:30");
+        model.script(reply("Perfecto."));
+        run();
+
+        var messages = model.lastMessages();
+        var asked = ((UserMessage) messages.getLast()).singleText();
+        assertTrue(asked.startsWith("10:30\n"), asked);
+        assertTrue(messages.stream().anyMatch(message -> message instanceof AiMessage ai
+                && "¿A qué hora te acomoda?\n1. 10:00\n2. 10:30\n3. 11:00".equals(ai.text())), messages::toString);
+    }
+
+    @Test
+    void moreOrLongerChoicesGoAsAListAndRowsAreTapped() {
+        customerSays("¿Qué servicios tienen?");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(reply("Tenemos estos servicios:", "Corte", "Tinte", "Manicure", "Pedicure"));
+        run();
+        assertEquals(List.of("list(Tenemos estos servicios:|Ver opciones|Corte|Tinte|Manicure|Pedicure)"),
+                gateway.sentTo(waId));
+
+        clock.advance(Duration.ofMinutes(1));
+        customerTaps("list-reply", "Manicure");
+        model.script(reply("¿Para qué día?"));
+        run();
+
+        var asked = ((UserMessage) model.lastMessages().getLast()).singleText();
+        assertTrue(asked.startsWith("Manicure\n"), asked);
+    }
+
+    @Test
     void modelNeverSeesTheCustomersPhone() {
         customerSays("Hola");
         model.script(reply("¡Hola! ¿En qué te ayudo?"));
@@ -155,7 +194,7 @@ class TurnWorkerTest {
         assertTrue(result.startsWith("Solo puedo agendar con al menos 30 minutos"), result);
         assertTrue(result.contains("10:15"), result);
         assertEquals(List.of(), appointments());
-        assertEquals(List.of("Necesito al menos 30 minutos. ¿Te sirve a las 10:15?\n1. 10:15\n2. 10:30"),
+        assertEquals(List.of("buttons(Necesito al menos 30 minutos. ¿Te sirve a las 10:15?|10:15|10:30)"),
                 gateway.sentTo(waId));
     }
 
@@ -270,6 +309,48 @@ class TurnWorkerTest {
     }
 
     @Test
+    void manuallyPausedChatGetsNoTurnUntilResumed() {
+        var conversationId = customerSays("Hola");
+        assistant(conversationId, "pause");
+        run();
+        assertEquals("A person is handling the chat", turnsOf(conversationId).getFirst().get("error"));
+
+        clock.advance(Duration.ofHours(13));
+        customerSays("¿Hay alguien?");
+        assertEquals(1, turnsOf(conversationId).size());
+
+        assistant(conversationId, "resume");
+        clock.advance(Duration.ofMinutes(1));
+        customerSays("Quiero una cita");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(reply("¡Claro! ¿Para qué servicio?"));
+        run();
+
+        assertEquals(2, turnsOf(conversationId).size());
+        assertEquals(List.of("¡Claro! ¿Para qué servicio?"), gateway.sentTo(waId));
+    }
+
+    @Test
+    void resumingAHandedOffChatLetsTheAssistantAnswerAgain() {
+        var conversationId = customerSays("Quiero hablar con alguien");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(tool("handOffToHuman", "{\"summary\": \"Pide una persona\"}"), reply("Claro."));
+        run();
+        clock.advance(Duration.ofMinutes(1));
+        customerSays("¿Hola?");
+        assertEquals(1, turnsOf(conversationId).size());
+
+        assistant(conversationId, "resume");
+        clock.advance(Duration.ofMinutes(1));
+        customerSays("Ya no, mejor agéndame");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(reply("¿Qué servicio?"));
+        run();
+
+        assertEquals(List.of("Claro.", "¿Qué servicio?"), gateway.sentTo(waId));
+    }
+
+    @Test
     void threeFailuresHandTheChatToAPerson() {
         var conversationId = customerSays("Hola");
         for (int attempt = 1; attempt <= 3; attempt++) {
@@ -321,6 +402,17 @@ class TurnWorkerTest {
 
     private UUID customerSays(String body) {
         return customerWrites(salon.owner(), salon.establishmentId(), line, waId, clock.instant(), body);
+    }
+
+    private void customerTaps(String payload, String title) {
+        MetaWebhooks.post(MetaWebhooks.payload(payload, Map.of("PHONE_NUMBER_ID", line, "WA_ID", waId,
+                "WAMID", MetaWebhooks.newWamid(), "TIMESTAMP", String.valueOf(clock.instant().getEpochSecond()),
+                "BODY", title))).statusCode(200);
+    }
+
+    private void assistant(UUID conversationId, String action) {
+        given().spec(salon.owner().spec()).header("Idempotency-Key", UUID.randomUUID().toString())
+                .post("/api/v1/conversations/" + conversationId + "/assistant/" + action).then().statusCode(200);
     }
 
     private void run() {

@@ -17,7 +17,7 @@ Meta changes field names, limits and error codes often. **Check every Meta detai
 | `MetaSignatureVerifier` | `infrastructure.meta` | HMAC-SHA256 of the raw body with the app secret, constant-time compare |
 | `MetaWebhookParser` | `infrastructure.meta` | The only class that knows Meta's JSON; turns it into domain-shaped records (`InboundEvent`, `StatusEvent`, `EchoEvent`, …) |
 | `WhatsappWebhookReader` (port) | `application.internal.outboundservices.whatsapp` | Signature check, verify token, and parsing into `WhatsappWebhookCommand`s |
-| `WhatsappGateway` (port) | `application.internal.outboundservices.whatsapp` | `sendText`, `sendTemplate`; buttons, lists and media join as their features ship |
+| `WhatsappGateway` (port) | `application.internal.outboundservices.whatsapp` | `sendText`, `sendButtons`, `sendList`, `sendTemplate` |
 | `WhatsappOnboarding` (port) | `application.internal.outboundservices.whatsapp` | Embedded Signup steps, creating the templates, unsubscribing |
 | `MetaGraphClient` | `infrastructure.meta` | Quarkus REST Client for the Graph API calls |
 | `MetaWhatsappGateway`, `MetaWhatsappOnboarding` | `infrastructure.meta` | Implement the ports with `MetaGraphClient`; active when `takodu.meta.enabled` (dev and test use fakes) |
@@ -40,7 +40,7 @@ Meta's JSON never leaves `infrastructure.meta`: the controller passes the raw bo
 | Account or partner removed | `WhatsappLine.disconnect()` | Line shown as disconnected |
 | Template status | `WhatsappLine.recordTemplateStatus` on the WABA's connected lines | Notifications wait until approved |
 
-Interactive replies (a tapped button or list row) are inbound messages of kind `interactive`/`button` with the selected title in `body`; they open a new window like any customer message. Unknown kinds are stored as `unsupported`, never dropped.
+A tapped button or list row is an inbound `interactive` (or template `button`) message with the title in `body`. Unknown kinds are stored as `unsupported`, never dropped.
 
 ## Sending
 
@@ -50,7 +50,7 @@ Every outbound message follows the same path, whoever sends it:
 2. It returns the existing message when the request's `Idempotency-Key` was already used, otherwise saves the `Message` as `pending` with that key in the caller's transaction (staff replies also call `recordHumanOutbound`, which pauses the assistant).
 3. `OutboundMessageSender` re-checks those rules, sends it through `WhatsappGateway` and records `sent` with the `wamid`. A failure waits 30 s, doubling each time, and the fifth one, or one Meta would repeat (`WhatsappSendException.retryable()` false), stores `failed` with Meta's error ([takodu-jobs](../takodu-jobs/SKILL.md)).
 
-Limits the gateway enforces before calling Meta: text ≤ 4,096 characters; reply buttons ≤ 3 with titles ≤ 20; list rows ≤ 10 with titles ≤ 24.
+Limits checked when queued: text ≤ 4,096 characters, interactive body ≤ 1,024; `InteractiveChoices` allows ≤ 3 distinct button titles of ≤ 20, or ≤ 10 list rows of ≤ 24. The row stores the choices (`interactive_style`, `interactive_options`); ids are positions, and a tap is read by its title.
 
 ## Appointment notifications
 
@@ -69,10 +69,10 @@ Limits the gateway enforces before calling Meta: text ≤ 4,096 characters; repl
 
 ## Tests
 
-- **Recorded payloads:** keep real Meta webhook JSON (anonymized) in `src/test/resources/meta/` (message, echo, status sequence, history, duplicate, unknown line) and replay each against `WebhookController` with a valid signature computed in the test. Assert rows, not logs.
+- **Recorded payloads:** keep real Meta webhook JSON (anonymized) in `src/test/resources/meta/` (message, taps, echo, statuses, history) and replay each against `WebhookController` with a valid signature computed in the test. Assert rows, not logs.
 - Replaying the same payload twice stores one message; a bad signature stores nothing and returns 401.
 - `Conversation.isWindowOpen`, `DeliveryStatus.advanceTo` and `ScheduledMessage.reminderFor` get plain JUnit tests at their boundaries (exactly 24 h, exactly 3 h).
-- Tests never call Meta: `WhatsappGateway` is replaced by a fake that records calls and can fail on demand.
+- Tests never call Meta: `RecordingWhatsappGateway` records sends and fails on demand.
 
 ## Checklist
 

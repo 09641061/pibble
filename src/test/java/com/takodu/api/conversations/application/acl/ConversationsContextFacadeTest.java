@@ -5,6 +5,7 @@ import com.takodu.api.conversations.application.internal.jobs.OutboundMessageSen
 import com.takodu.api.conversations.application.internal.outboundservices.whatsapp.RecordingWhatsappGateway;
 import com.takodu.api.conversations.interfaces.acl.ChatLineView;
 import com.takodu.api.conversations.interfaces.acl.ConversationsContextFacade;
+import com.takodu.api.conversations.interfaces.acl.ReplyChoicesView;
 import com.takodu.api.shared.infrastructure.time.TestClock;
 import com.takodu.api.shared.testing.TestSalon;
 import com.takodu.api.shared.testing.TestTenants;
@@ -76,8 +77,8 @@ class ConversationsContextFacadeTest {
         var key = UUID.randomUUID();
         clock.advance(Duration.ofMinutes(1));
 
-        assertTrue(conversations.sendAssistantReply(salon.owner().organizationId(), conversationId, "¡Hola!", key));
-        assertTrue(conversations.sendAssistantReply(salon.owner().organizationId(), conversationId, "¡Hola!", key));
+        assertTrue(conversations.sendAssistantReply(salon.owner().organizationId(), conversationId, "¡Hola!", null, key));
+        assertTrue(conversations.sendAssistantReply(salon.owner().organizationId(), conversationId, "¡Hola!", null, key));
         sender.sendDue();
 
         assertEquals(List.of("¡Hola!"), gateway.sentTo(waId));
@@ -85,6 +86,44 @@ class ConversationsContextFacadeTest {
                 .body("items[0].origin", equalTo("assistant"))
                 .body("items[0].status", equalTo("sent"));
         conversation(salon.owner(), conversationId).body("unreadCount", equalTo(1));
+    }
+
+    @Test
+    void replyWithButtonsGoesAsButtonsAndShowsItsChoices() {
+        var salon = TestSalon.open();
+        var waId = newWaId();
+        var conversationId = customerWritesNow(salon, waId);
+        clock.advance(Duration.ofMinutes(1));
+
+        assertTrue(conversations.sendAssistantReply(salon.owner().organizationId(), conversationId, "¿A qué hora?",
+                new ReplyChoicesView(ReplyChoicesView.Style.BUTTONS, List.of("10:00", "11:00")), UUID.randomUUID()));
+        sender.sendDue();
+
+        assertEquals(List.of("buttons(¿A qué hora?|10:00|11:00)"), gateway.sentTo(waId));
+        messages(salon.owner(), conversationId).statusCode(200)
+                .body("items[0].kind", equalTo("interactive"))
+                .body("items[0].body", equalTo("¿A qué hora?"))
+                .body("items[0].choicesStyle", equalTo("buttons"))
+                .body("items[0].choices", equalTo(List.of("10:00", "11:00")))
+                .body("items[1].choices", equalTo(List.of()));
+        assertEquals("¿A qué hora?\n1. 10:00\n2. 11:00", conversations.fetchRecentMessages(
+                salon.owner().organizationId(), conversationId, 20).getLast().text());
+    }
+
+    @Test
+    void replyWithAListGoesAsAListBehindItsButton() {
+        var salon = TestSalon.open();
+        var waId = newWaId();
+        var conversationId = customerWritesNow(salon, waId);
+        clock.advance(Duration.ofMinutes(1));
+
+        assertTrue(conversations.sendAssistantReply(salon.owner().organizationId(), conversationId, "Elige uno",
+                new ReplyChoicesView(ReplyChoicesView.Style.LIST, List.of("Corte", "Tinte", "Manicure", "Pedicure")),
+                UUID.randomUUID()));
+        sender.sendDue();
+
+        assertEquals(List.of("list(Elige uno|Ver opciones|Corte|Tinte|Manicure|Pedicure)"), gateway.sentTo(waId));
+        messages(salon.owner(), conversationId).statusCode(200).body("items[0].choicesStyle", equalTo("list"));
     }
 
     @Test
@@ -96,7 +135,7 @@ class ConversationsContextFacadeTest {
         assertTrue(conversations.fetchConversation(salon.owner().organizationId(), conversationId).orElseThrow()
                 .assistantPaused());
         assertFalse(conversations.sendAssistantReply(salon.owner().organizationId(), conversationId, "¡Hola!",
-                UUID.randomUUID()));
+                null, UUID.randomUUID()));
     }
 
     @Test

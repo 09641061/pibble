@@ -25,6 +25,18 @@ public class RecordingWhatsappGateway implements WhatsappGateway {
         return record(to, body);
     }
 
+    /** Records the buttons as {@code buttons(body|title|title)}. */
+    @Override
+    public Wamid sendButtons(WhatsappLine line, String to, String body, List<String> titles) {
+        return record(to, "buttons(" + body + "|" + String.join("|", titles) + ")");
+    }
+
+    /** Records the list as {@code list(body|button label|row|row)}. */
+    @Override
+    public Wamid sendList(WhatsappLine line, String to, String body, String buttonLabel, List<String> rows) {
+        return record(to, "list(" + body + "|" + buttonLabel + "|" + String.join("|", rows) + ")");
+    }
+
     /** Records the template as {@code name(parameter|parameter|...)}, beside the texts. */
     @Override
     public Wamid sendTemplate(WhatsappLine line, String to, String templateName, String language,
@@ -40,7 +52,7 @@ public class RecordingWhatsappGateway implements WhatsappGateway {
         return new Wamid("wamid.SENT" + UUID.randomUUID().toString().replace("-", ""));
     }
 
-    /** @return the texts and templates sent to the WhatsApp id, oldest first */
+    /** @return the texts, buttons, lists and templates sent to the WhatsApp id, oldest first */
     public List<String> sentTo(String waId) {
         return sent.getOrDefault(waId, List.of());
     }

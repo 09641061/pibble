@@ -120,6 +120,24 @@ class WhatsappWebhookControllerTest {
     }
 
     @Test
+    void tapOnAButtonOrListRowIsStoredWithItsTitle() {
+        var line = connectedLine();
+        var waId = newWaId();
+        var button = newWamid();
+        var row = newWamid();
+
+        post(payload("button-reply", Map.of("PHONE_NUMBER_ID", line, "WA_ID", waId, "WAMID", button, "BODY", "10:00")))
+                .statusCode(200);
+        post(payload("list-reply", Map.of("PHONE_NUMBER_ID", line, "WA_ID", waId, "WAMID", row, "BODY", "Manicure")))
+                .statusCode(200);
+
+        assertEquals("interactive", messagesWithWamid(button).getFirst().get("kind"));
+        assertEquals("10:00", messagesWithWamid(button).getFirst().get("body"));
+        assertEquals("interactive", messagesWithWamid(row).getFirst().get("kind"));
+        assertEquals("Manicure", messagesWithWamid(row).getFirst().get("body"));
+    }
+
+    @Test
     void ownerReplyFromThePhoneIsStoredAndPausesTheAssistant() {
         var line = connectedLine();
         var waId = newWaId();

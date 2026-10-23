@@ -174,7 +174,7 @@ public class AssistantTurnCommandServiceImpl implements AssistantTurnCommandServ
                 answeredThrough = turn.getTriggerAt();
             }
             var sent = externalConversationService.sendReply(turn.getOrganizationId(), turn.getConversationId(),
-                    reply.asText(), TurnKeys.of(turn.getId(), "reply"));
+                    reply, TurnKeys.of(turn.getId(), "reply"));
             if (sent) turnScope.handOffSummary().ifPresent(summary -> externalConversationService.handOff(
                     turn.getOrganizationId(), turn.getConversationId(), summary));
             var finalUsage = usage;

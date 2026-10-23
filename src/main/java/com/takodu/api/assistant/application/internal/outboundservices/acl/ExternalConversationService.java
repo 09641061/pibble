@@ -1,9 +1,11 @@
 package com.takodu.api.assistant.application.internal.outboundservices.acl;
 
+import com.takodu.api.assistant.domain.model.valueobjects.AssistantReply;
 import com.takodu.api.assistant.domain.model.valueobjects.ChatLine;
 import com.takodu.api.assistant.domain.model.valueobjects.ConversationId;
 import com.takodu.api.assistant.domain.model.valueobjects.ConversationState;
 import com.takodu.api.conversations.interfaces.acl.ConversationsContextFacade;
+import com.takodu.api.conversations.interfaces.acl.ReplyChoicesView;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
@@ -41,11 +43,20 @@ public class ExternalConversationService {
                 .toList();
     }
 
-    /** @return whether the reply is queued; false when the assistant may no longer answer the chat (A2) */
-    public boolean sendReply(OrganizationId organizationId, ConversationId conversationId, String text,
+    /**
+     * Sends the reply in the format its options fit (08 §5).
+     *
+     * @return whether the reply is queued; false when the assistant may no longer answer the chat (A2)
+     */
+    public boolean sendReply(OrganizationId organizationId, ConversationId conversationId, AssistantReply reply,
                              UUID idempotencyKey) {
-        return conversationsContextFacade.sendAssistantReply(organizationId.value(), conversationId.value(), text,
-                idempotencyKey);
+        var choices = switch (reply.format()) {
+            case TEXT -> null;
+            case BUTTONS -> new ReplyChoicesView(ReplyChoicesView.Style.BUTTONS, reply.options());
+            case LIST -> new ReplyChoicesView(ReplyChoicesView.Style.LIST, reply.options());
+        };
+        return conversationsContextFacade.sendAssistantReply(organizationId.value(), conversationId.value(),
+                reply.body(), choices, idempotencyKey);
     }
 
     /** A7 */

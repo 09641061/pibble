@@ -2,6 +2,7 @@ package com.takodu.api.conversations.domain.model.aggregates;
 
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
+import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageContent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageDirection;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
@@ -37,6 +38,8 @@ public class Message {
     private final MessageContent content;
     private final String templateName;
     private final List<String> templateParameters;
+    /** The buttons or list rows of an outbound interactive message; null otherwise. */
+    private final InteractiveChoices choices;
     private DeliveryStatus status;
     private String error;
     private String pricingCategory;
@@ -51,11 +54,13 @@ public class Message {
     public static Message inbound(Conversation conversation, Wamid wamid, MessageContent content, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.IN,
                 MessageOrigin.CUSTOMER, Objects.requireNonNull(wamid, "wamid is required"), content, null,
-                List.of(), DeliveryStatus.RECEIVED, null, null, null, null, 0, null, null, at);
+                List.of(), null, DeliveryStatus.RECEIVED, null, null, null, null, 0, null, null, at);
     }
 
     /** WhatsApp's limit for a text message. */
     public static final int MAX_TEXT = 4096;
+    /** WhatsApp's limit for the body of reply buttons, the stricter of the two interactive kinds. */
+    public static final int MAX_INTERACTIVE_BODY = 1024;
     /** The first retry waits this long; each next one waits twice as long (30 s, 1 min, 2 min, 4 min). */
     public static final Duration FIRST_RETRY = Duration.ofSeconds(30);
 
@@ -69,8 +74,8 @@ public class Message {
         if (body == null || body.isBlank()) throw new IllegalArgumentException("Write a message");
         if (body.length() > MAX_TEXT) throw new IllegalArgumentException("A message has at most 4096 characters");
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
-                MessageOrigin.STAFF, null, MessageContent.text(body), null, List.of(), DeliveryStatus.PENDING, null,
-                null, null, Objects.requireNonNull(sentBy, "Staff messages record who sent them"), 0, now, idempotencyKey, now);
+                MessageOrigin.STAFF, null, MessageContent.text(body), null, List.of(), null, DeliveryStatus.PENDING,
+                null, null, null, Objects.requireNonNull(sentBy, "Staff messages record who sent them"), 0, now, idempotencyKey, now);
     }
 
     /**
@@ -84,7 +89,25 @@ public class Message {
         if (body == null || body.isBlank()) throw new IllegalArgumentException("The assistant's reply is empty");
         if (body.length() > MAX_TEXT) throw new IllegalArgumentException("A message has at most 4096 characters");
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
-                MessageOrigin.ASSISTANT, null, MessageContent.text(body), null, List.of(), DeliveryStatus.PENDING, null,
+                MessageOrigin.ASSISTANT, null, MessageContent.text(body), null, List.of(), null,
+                DeliveryStatus.PENDING, null, null, null, null, 0, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"), now);
+    }
+
+    /**
+     * A8, 08 §5: the assistant's reply with reply buttons or a list, queued like its text replies. The body is the
+     * text above the choices.
+     *
+     * @throws IllegalArgumentException when the body is blank or longer than 1,024 characters, WhatsApp's limit for
+     *         the body of an interactive message
+     */
+    public static Message assistantInteractive(Conversation conversation, String body, InteractiveChoices choices,
+                                               Instant now, IdempotencyKey idempotencyKey) {
+        if (body == null || body.isBlank()) throw new IllegalArgumentException("The assistant's reply is empty");
+        if (body.length() > MAX_INTERACTIVE_BODY)
+            throw new IllegalArgumentException("An interactive message has at most 1024 characters");
+        return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
+                MessageOrigin.ASSISTANT, null, new MessageContent(MessageKind.INTERACTIVE, body, null, null), null,
+                List.of(), Objects.requireNonNull(choices, "choices are required"), DeliveryStatus.PENDING, null,
                 null, null, null, 0, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"), now);
     }
 
@@ -100,7 +123,7 @@ public class Message {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
                 MessageOrigin.SYSTEM, null, new MessageContent(asTemplate ? MessageKind.TEMPLATE : MessageKind.TEXT,
                 body, null, null), asTemplate ? template.metaName() : null,
-                asTemplate ? template.parameters(parameters) : List.of(), DeliveryStatus.PENDING, null, null, null,
+                asTemplate ? template.parameters(parameters) : List.of(), null, DeliveryStatus.PENDING, null, null, null,
                 null, 0, now, null, now);
     }
 
@@ -108,7 +131,7 @@ public class Message {
     public static Message businessAppEcho(Conversation conversation, Wamid wamid, MessageContent content, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
                 MessageOrigin.BUSINESS_APP, Objects.requireNonNull(wamid, "wamid is required"), content, null,
-                List.of(), DeliveryStatus.SENT, null, null, null, null, 0, null, null, at);
+                List.of(), null, DeliveryStatus.SENT, null, null, null, null, 0, null, null, at);
     }
 
     /**
@@ -120,14 +143,15 @@ public class Message {
                                   boolean fromCustomer, DeliveryStatus status, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(),
                 fromCustomer ? MessageDirection.IN : MessageDirection.OUT, MessageOrigin.HISTORY,
-                Objects.requireNonNull(wamid, "wamid is required"), content, null, List.of(),
+                Objects.requireNonNull(wamid, "wamid is required"), content, null, List.of(), null,
                 fromCustomer ? DeliveryStatus.RECEIVED : status, null, null, null, null, 0, null, null, at);
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
     public Message(MessageId id, OrganizationId organizationId, ConversationId conversationId,
                    MessageDirection direction, MessageOrigin origin, Wamid wamid, MessageContent content,
-                   String templateName, List<String> templateParameters, DeliveryStatus status, String error,
+                   String templateName, List<String> templateParameters, InteractiveChoices choices,
+                   DeliveryStatus status, String error,
                    String pricingCategory, Boolean billable, MemberId sentBy, int attempts, Instant nextAttemptAt,
                    IdempotencyKey idempotencyKey, Instant occurredAt) {
         this.id = id;
@@ -139,6 +163,7 @@ public class Message {
         this.content = Objects.requireNonNull(content, "content is required");
         this.templateName = templateName;
         this.templateParameters = List.copyOf(templateParameters);
+        this.choices = choices;
         this.status = Objects.requireNonNull(status, "status is required");
         this.error = error;
         this.pricingCategory = pricingCategory;
@@ -179,6 +204,11 @@ public class Message {
         status = status.advanceTo(DeliveryStatus.FAILED);
         error = reason;
         nextAttemptAt = null;
+    }
+
+    /** @return whether it offers the customer buttons or a list to tap */
+    public boolean isInteractiveOut() {
+        return direction == MessageDirection.OUT && choices != null;
     }
 
     /** @return whether the outbox still has to send it */

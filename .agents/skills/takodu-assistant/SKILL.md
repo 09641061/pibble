@@ -5,15 +5,15 @@ description: How the customer-facing AI booking assistant of the pibble backend 
 
 # The assistant in pibble
 
-The assistant answers customers on the establishment's WhatsApp line and books into the real calendar. It is a booking assistant for one business, not a general chatbot. The decision is [customer-facing assistant with in-process tools](../../../docs/decisions/implemented/2026-10-19-assistant-with-in-process-tools.md); the product design is `../docs/08-ai-assistant.md`; rules A1–A9 and B9, B14 are in `../docs/03-business-domain.md`. Package names are relative to `com.takodu.api.assistant`.
+The assistant answers customers on the establishment's WhatsApp line and books into the real calendar; it is not a general chatbot. The decision is [customer-facing assistant with in-process tools](../../../docs/decisions/implemented/2026-10-19-assistant-with-in-process-tools.md); the product design is `../docs/08-ai-assistant.md`; rules A1–A9 and B9, B14 are in `../docs/03-business-domain.md`. Package names are relative to `com.takodu.api.assistant`.
 
 ## Rules that do not bend
 
-1. **The model never chooses the tenant.** `TurnScope` binds organization, establishment, conversation and customer from the turn before the model runs. **No `@Tool` method takes an organization, establishment, customer, member or appointment id**; `ArchitectureTest` rejects `UUID` and `*Id` types and parameters named `*Id`. Tools take names, local dates and times, and the position of an appointment in the last `myAppointments` list.
+1. **The model never chooses the tenant.** `TurnScope` binds organization, establishment, conversation and customer from the turn before the model runs. **No `@Tool` method takes an organization, establishment, customer, member or appointment id**; `ArchitectureTest` rejects `UUID` and `*Id` types and parameters named `*Id`. Tools take names, local dates and times, and an appointment's position in the last `myAppointments` list.
 2. **Same rules as staff.** Every write goes through `ExternalBookingService` → `BookingContextFacade`, which runs `AvailabilityPolicy` and the database constraints. Cut-offs (30 minutes lead, 60 days ahead, 2 hours before a change) live in `booking`, never only in the prompt.
 3. **Tools, not knowledge.** Services, prices, hours and free slots come from a tool call or the owner's business info; the prompt forbids inventing them.
-4. **One mechanism.** LangChain4j tool calling in process. No keyword router, no parsing tool calls out of text, no MCP.
-5. **Humans win.** Any human message pauses the assistant on that conversation (A3); the assistant never answers a paused conversation.
+4. **One mechanism.** LangChain4j tool calling in process; no keyword router, no MCP.
+5. **Humans win.** A human message pauses the assistant 12 hours (A3); staff pause it until resumed (`/assistant/pause`), and `/assistant/resume` clears every pause and a handoff. A paused conversation gets no turn.
 
 ## Where things live
 
@@ -54,14 +54,14 @@ public String findSlots(String serviceName, String date,
 ```
 
 - Descriptions and results are short Spanish text written for the model; times are local to the establishment.
-- **Business failures are returned as text, never thrown**: catch the context exception (`SlotUnavailableException`, `AppointmentChangeTooLateException`) and return the reason plus the next step ("Ese horario ya no está disponible. Horarios libres: 10:30, 11:00"). Only infrastructure errors escape and fail the turn.
+- **Business failures are returned as text, never thrown**: map the context exception to the reason plus the next step ("Ese horario ya no está disponible. Horarios libres: 10:30, 11:00"). Only infrastructure errors fail the turn.
 - A request past the B14 cut-off, a complaint, a request for a person, unreadable media or two failed attempts ends with `handOffToHuman(summary)` (A7).
 - Every write tool passes an `IdempotencyKey` derived from `scope.turnId()`, the tool name and its arguments, so a retried turn never books, reschedules or cancels twice.
-- Never put the customer's phone number in a tool result or the prompt.
+- Never put the customer's phone in a tool result or the prompt.
 
 ## Reply rendering
 
-The model returns `AgentReply(text, options)` as JSON; `AssistantReply.asText()` writes the options as numbered lines and caps the message at 1,000 characters. Buttons and lists (08 §5) come with `sendButtons` and `sendList` on `WhatsappGateway`. One message per turn.
+The model returns `AgentReply(text, options)` as JSON. `AssistantReply.format()` holds the 08 §5 rule: 1–3 options of ≤ 20 characters → buttons, ≤ 10 of ≤ 24 → list, otherwise numbered lines in `body()` (≤ 1,000 characters). `ExternalConversationService.sendReply` passes the choice as `ReplyChoicesView`; a tap returns as the next customer message.
 
 ## Guardrails
 

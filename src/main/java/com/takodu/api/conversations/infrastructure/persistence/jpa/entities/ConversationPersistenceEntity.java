@@ -47,4 +47,13 @@ public class ConversationPersistenceEntity extends AuditableAbstractPersistenceE
 
     @Column(name = "handoff_summary")
     private String handoffSummary;
+
+    @Column(name = "assistant_manually_paused_at")
+    private Instant manuallyPausedAt;
+
+    @Column(name = "assistant_manually_paused_by")
+    private UUID manuallyPausedBy;
+
+    @Column(name = "last_idempotency_key")
+    private UUID lastIdempotencyKey;
 }
