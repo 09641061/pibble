@@ -1,10 +1,12 @@
 package com.takodu.api.conversations.infrastructure.persistence.jpa.entities;
 
 import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
+import com.takodu.api.conversations.domain.model.valueobjects.MediaStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageDirection;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageOrigin;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.converters.DeliveryStatusPersistenceConverter;
+import com.takodu.api.conversations.infrastructure.persistence.jpa.converters.MediaStatusPersistenceConverter;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.converters.MessageDirectionPersistenceConverter;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.converters.MessageKindPersistenceConverter;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.converters.MessageOriginPersistenceConverter;
@@ -55,6 +57,22 @@ public class MessagePersistenceEntity extends AuditableAbstractPersistenceEntity
 
     @Column(name = "media_mime", updatable = false)
     private String mediaMime;
+
+    @Column(name = "media_path")
+    private String mediaPath;
+
+    @Convert(converter = MediaStatusPersistenceConverter.class)
+    @Column(name = "media_status")
+    private MediaStatus mediaStatus;
+
+    @Column(name = "media_attempts", nullable = false)
+    private short mediaAttempts;
+
+    @Column(name = "media_next_attempt_at")
+    private Instant mediaNextAttemptAt;
+
+    @Column(name = "media_error")
+    private String mediaError;
 
     @Column(name = "template_name", updatable = false)
     private String templateName;

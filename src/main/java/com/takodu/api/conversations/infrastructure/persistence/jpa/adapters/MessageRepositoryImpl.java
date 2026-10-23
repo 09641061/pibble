@@ -2,6 +2,7 @@ package com.takodu.api.conversations.infrastructure.persistence.jpa.adapters;
 
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.PageCursor;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.conversations.domain.repositories.MessageRepository;
@@ -39,6 +40,12 @@ public class MessageRepositoryImpl implements MessageRepository {
     }
 
     @Override
+    public Optional<Message> findById(OrganizationId organizationId, MessageId messageId) {
+        return messagePersistenceRepository.findById(organizationId.value(), messageId.value())
+                .map(MessagePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
     public Optional<Message> findByIdempotencyKey(OrganizationId organizationId, IdempotencyKey idempotencyKey) {
         return messagePersistenceRepository.findByIdempotencyKey(organizationId.value(), idempotencyKey.value())
                 .map(MessagePersistenceAssembler::toDomainFromPersistence);
@@ -56,6 +63,12 @@ public class MessageRepositoryImpl implements MessageRepository {
     @Override
     public Optional<Message> claimNextPending(Instant now) {
         return messagePersistenceRepository.claimNextPending(now).map(MessagePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<Message> claimNextMediaDue(Instant now) {
+        return messagePersistenceRepository.claimNextMediaDue(now)
+                .map(MessagePersistenceAssembler::toDomainFromPersistence);
     }
 
     /** A duplicate wamid cannot reach here: writers lock the conversation and check the wamid first (W4). */

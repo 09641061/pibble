@@ -2,6 +2,7 @@ package com.takodu.api.conversations.domain.repositories;
 
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.PageCursor;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
@@ -20,6 +21,8 @@ public interface MessageRepository {
     @CrossTenant("A status webhook updates the message it reports on; the message carries its organization")
     Optional<Message> lockByWamid(Wamid wamid);
 
+    Optional<Message> findById(OrganizationId organizationId, MessageId messageId);
+
     Optional<Message> findByIdempotencyKey(OrganizationId organizationId, IdempotencyKey idempotencyKey);
 
     /** @return the conversation's messages, newest first, before the cursor */
@@ -32,6 +35,13 @@ public interface MessageRepository {
      */
     @CrossTenant("The sender job claims due messages of every organization; the message carries its organization")
     Optional<Message> claimNextPending(Instant now);
+
+    /**
+     * Locks the message whose media download is due first by {@code now} with {@code FOR UPDATE SKIP LOCKED}, so two
+     * media jobs never download the same file.
+     */
+    @CrossTenant("The media job claims due downloads of every organization; the message carries its organization")
+    Optional<Message> claimNextMediaDue(Instant now);
 
     /**
      * @throws com.takodu.api.shared.domain.exceptions.RequestInProgressException when a concurrent request with the

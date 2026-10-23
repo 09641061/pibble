@@ -15,7 +15,8 @@ public final class MessageResourceFromEntityAssembler {
         var choices = message.getChoices();
         return new MessageResource(message.getId().value(), message.getConversationId().value(),
                 lower(message.getDirection()), lower(message.getOrigin()), lower(content.kind()), content.body(),
-                content.mediaId() != null, content.mediaMime(), message.getTemplateName(), lower(message.getStatus()),
+                content.mediaId() != null, content.mediaMime(),
+                message.mediaStatus() == null ? null : lower(message.mediaStatus()), message.getTemplateName(), lower(message.getStatus()),
                 message.getError(), message.getSentBy() == null ? null : message.getSentBy().value(),
                 choices == null ? null : lower(choices.style()), choices == null ? List.of() : choices.titles(),
                 message.getOccurredAt());

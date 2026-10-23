@@ -3,6 +3,8 @@ package com.takodu.api.conversations.domain.model.aggregates;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
+import com.takodu.api.conversations.domain.model.valueobjects.MediaStatus;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageContent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageKind;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageOrigin;
 import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
@@ -107,6 +109,38 @@ class MessageTest {
         assertNull(text.getTemplateName());
         assertEquals(template.getContent().body(), text.getContent().body());
         assertEquals(DeliveryStatus.PENDING, text.getStatus());
+    }
+
+    @Test
+    void customersPhotoWaitsForTheMediaJobAndTextHasNothingToDownload() {
+        var photo = Message.inbound(conversation(), new Wamid("wamid.2"),
+                new MessageContent(MessageKind.IMAGE, null, "media-1", "image/jpeg"), NOW);
+        assertEquals(MediaStatus.PENDING, photo.mediaStatus());
+
+        photo.recordMediaStored("org/photo");
+
+        assertEquals(MediaStatus.READY, photo.mediaStatus());
+        assertEquals("org/photo", photo.getMedia().path());
+        assertNull(reply("Hola").mediaStatus());
+        assertThrows(IllegalStateException.class, () -> reply("Hola").recordMediaStored("a"));
+    }
+
+    @Test
+    void staffTemplateRecordsWhoSentItAndItsKey() {
+        var parameters = List.of("Ana", "Corte", "Sede Miraflores", "sábado 24 de octubre", "10:00");
+        var key = new IdempotencyKey(UUID.randomUUID());
+        var staff = new MemberId(UUID.randomUUID());
+
+        var message = Message.staffNotification(conversation(), staff, NotificationTemplate.REMINDER, parameters,
+                true, NOW, key);
+
+        assertEquals(MessageOrigin.STAFF, message.getOrigin());
+        assertEquals(MessageKind.TEMPLATE, message.getContent().kind());
+        assertEquals("takodu_reminder", message.getTemplateName());
+        assertEquals(staff, message.getSentBy());
+        assertEquals(key, message.getIdempotencyKey());
+        assertThrows(NullPointerException.class, () -> Message.staffNotification(conversation(), null,
+                NotificationTemplate.REMINDER, parameters, true, NOW, key));
     }
 
     private static Message reply(String body) {

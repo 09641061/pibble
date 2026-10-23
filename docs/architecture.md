@@ -13,7 +13,7 @@ Each context is a direct subpackage of `com.takodu.api`; `shared` is the kernel 
 | `organization` | supporting | `Organization`, `Establishment`, `Member`, `Service` | `iam` | — |
 | `customers` | supporting | `Customer` | — | — |
 | `booking` | core | `Appointment`, `TimeBlock` | `organization`, `customers` | `AppointmentBooked`, `AppointmentRescheduled`, `AppointmentCancelled` |
-| `conversations` | core | `WhatsappLine`, `Conversation`, `Message`, `ScheduledMessage` | `organization`, `customers`, `booking` (events only) | `InboundMessageReceived` |
+| `conversations` | core | `WhatsappLine`, `Conversation`, `Message`, `ScheduledMessage` | `organization`, `customers`, `booking` (events, [templates](decisions/implemented/2026-10-22-staff-templates-read-appointments-from-booking.md)) | `InboundMessageReceived` |
 | `assistant` | core | `AssistantSettings`, `AssistantTurn` | `organization`, `customers`, `booking`, `conversations` | — |
 
 `ArchitectureTest.ALLOWED_DEPENDENCIES` mirrors the "May depend on" column, and a class in a package missing from it fails the build. Change the table, the map and, for a new context, a decision record in the same commit.

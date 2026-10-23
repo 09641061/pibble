@@ -3,6 +3,8 @@ package com.takodu.api.conversations.domain.model.aggregates;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.model.valueobjects.DeliveryStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
+import com.takodu.api.conversations.domain.model.valueobjects.MediaDownload;
+import com.takodu.api.conversations.domain.model.valueobjects.MediaStatus;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageContent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageDirection;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
@@ -49,12 +51,15 @@ public class Message {
     private Instant nextAttemptAt;
     private final IdempotencyKey idempotencyKey;
     private final Instant occurredAt;
+    /** The download of the image, audio, video, document or sticker it carries; null when it carries none. */
+    private MediaDownload media;
 
     /** W4: a customer message from the webhook. */
     public static Message inbound(Conversation conversation, Wamid wamid, MessageContent content, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.IN,
                 MessageOrigin.CUSTOMER, Objects.requireNonNull(wamid, "wamid is required"), content, null,
-                List.of(), null, DeliveryStatus.RECEIVED, null, null, null, null, 0, null, null, at);
+                List.of(), null, DeliveryStatus.RECEIVED, null, null, null, null, 0, null, null, at,
+                MediaDownload.of(content, at));
     }
 
     /** WhatsApp's limit for a text message. */
@@ -75,7 +80,8 @@ public class Message {
         if (body.length() > MAX_TEXT) throw new IllegalArgumentException("A message has at most 4096 characters");
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
                 MessageOrigin.STAFF, null, MessageContent.text(body), null, List.of(), null, DeliveryStatus.PENDING,
-                null, null, null, Objects.requireNonNull(sentBy, "Staff messages record who sent them"), 0, now, idempotencyKey, now);
+                null, null, null, Objects.requireNonNull(sentBy, "Staff messages record who sent them"), 0, now, idempotencyKey, now,
+                null);
     }
 
     /**
@@ -90,7 +96,8 @@ public class Message {
         if (body.length() > MAX_TEXT) throw new IllegalArgumentException("A message has at most 4096 characters");
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
                 MessageOrigin.ASSISTANT, null, MessageContent.text(body), null, List.of(), null,
-                DeliveryStatus.PENDING, null, null, null, null, 0, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"), now);
+                DeliveryStatus.PENDING, null, null, null, null, 0, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"), now,
+                null);
     }
 
     /**
@@ -108,7 +115,8 @@ public class Message {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
                 MessageOrigin.ASSISTANT, null, new MessageContent(MessageKind.INTERACTIVE, body, null, null), null,
                 List.of(), Objects.requireNonNull(choices, "choices are required"), DeliveryStatus.PENDING, null,
-                null, null, null, 0, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"), now);
+                null, null, null, 0, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"), now,
+                null);
     }
 
     /**
@@ -119,19 +127,40 @@ public class Message {
      */
     public static Message notification(Conversation conversation, NotificationTemplate template,
                                        List<String> parameters, boolean asTemplate, Instant now) {
+        return notification(conversation, MessageOrigin.SYSTEM, null, template, parameters, asTemplate, now, null);
+    }
+
+    /**
+     * W6, 07 §7: staff send an appointment's reminder or confirmation, which reaches a customer whose window is
+     * closed. It goes and shows like the dispatcher's, but records who sent it.
+     *
+     * @param asTemplate whether it must go as the template, as for {@link #notification}
+     */
+    public static Message staffNotification(Conversation conversation, MemberId sentBy, NotificationTemplate template,
+                                            List<String> parameters, boolean asTemplate, Instant now,
+                                            IdempotencyKey idempotencyKey) {
+        return notification(conversation, MessageOrigin.STAFF,
+                Objects.requireNonNull(sentBy, "Staff messages record who sent them"), template, parameters,
+                asTemplate, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"));
+    }
+
+    private static Message notification(Conversation conversation, MessageOrigin origin, MemberId sentBy,
+                                        NotificationTemplate template, List<String> parameters, boolean asTemplate,
+                                        Instant now, IdempotencyKey idempotencyKey) {
         var body = template.render(parameters);
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
-                MessageOrigin.SYSTEM, null, new MessageContent(asTemplate ? MessageKind.TEMPLATE : MessageKind.TEXT,
+                origin, null, new MessageContent(asTemplate ? MessageKind.TEMPLATE : MessageKind.TEXT,
                 body, null, null), asTemplate ? template.metaName() : null,
                 asTemplate ? template.parameters(parameters) : List.of(), null, DeliveryStatus.PENDING, null, null, null,
-                null, 0, now, null, now);
+                sentBy, 0, now, idempotencyKey, now, null);
     }
 
     /** W5: the owner replied from the WhatsApp Business app; WhatsApp already sent it. */
     public static Message businessAppEcho(Conversation conversation, Wamid wamid, MessageContent content, Instant at) {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
                 MessageOrigin.BUSINESS_APP, Objects.requireNonNull(wamid, "wamid is required"), content, null,
-                List.of(), null, DeliveryStatus.SENT, null, null, null, null, 0, null, null, at);
+                List.of(), null, DeliveryStatus.SENT, null, null, null, null, 0, null, null, at,
+                MediaDownload.of(content, at));
     }
 
     /**
@@ -144,7 +173,8 @@ public class Message {
         return new Message(null, conversation.getOrganizationId(), conversation.getId(),
                 fromCustomer ? MessageDirection.IN : MessageDirection.OUT, MessageOrigin.HISTORY,
                 Objects.requireNonNull(wamid, "wamid is required"), content, null, List.of(), null,
-                fromCustomer ? DeliveryStatus.RECEIVED : status, null, null, null, null, 0, null, null, at);
+                fromCustomer ? DeliveryStatus.RECEIVED : status, null, null, null, null, 0, null, null, at,
+                MediaDownload.of(content, at));
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
@@ -153,7 +183,7 @@ public class Message {
                    String templateName, List<String> templateParameters, InteractiveChoices choices,
                    DeliveryStatus status, String error,
                    String pricingCategory, Boolean billable, MemberId sentBy, int attempts, Instant nextAttemptAt,
-                   IdempotencyKey idempotencyKey, Instant occurredAt) {
+                   IdempotencyKey idempotencyKey, Instant occurredAt, MediaDownload media) {
         this.id = id;
         this.organizationId = Objects.requireNonNull(organizationId, "organizationId is required");
         this.conversationId = Objects.requireNonNull(conversationId, "conversationId is required");
@@ -173,6 +203,33 @@ public class Message {
         this.nextAttemptAt = nextAttemptAt;
         this.idempotencyKey = idempotencyKey;
         this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt is required");
+        if ((media == null) != (content.mediaId() == null))
+            throw new IllegalArgumentException("Only a message with media has a media download");
+        this.media = media;
+    }
+
+    /** The media job stored the file. */
+    public void recordMediaStored(String path) {
+        media = requireMedia().stored(path);
+    }
+
+    /**
+     * The download failed; it is tried again later unless the failure will repeat or this was the fifth attempt.
+     *
+     * @param retryable whether trying again may succeed, as after a timeout or an expired url
+     */
+    public void recordMediaFailure(String why, boolean retryable, Instant now) {
+        media = requireMedia().failed(why, retryable, now);
+    }
+
+    /** @return the download's state, or null when the message carries no media */
+    public MediaStatus mediaStatus() {
+        return media == null ? null : media.status();
+    }
+
+    private MediaDownload requireMedia() {
+        if (media == null) throw new IllegalStateException("The message carries no media");
+        return media;
     }
 
     /** Meta accepted the message. */

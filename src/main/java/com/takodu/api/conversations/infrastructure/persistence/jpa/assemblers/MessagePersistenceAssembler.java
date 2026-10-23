@@ -3,6 +3,7 @@ package com.takodu.api.conversations.infrastructure.persistence.jpa.assemblers;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
+import com.takodu.api.conversations.domain.model.valueobjects.MediaDownload;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageContent;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
@@ -31,7 +32,10 @@ public final class MessagePersistenceAssembler {
                 entity.getBillable(), entity.getSentByMemberId() == null ? null : new MemberId(entity.getSentByMemberId()),
                 entity.getAttempts(), entity.getNextAttemptAt(),
                 entity.getIdempotencyKey() == null ? null : new IdempotencyKey(entity.getIdempotencyKey()),
-                entity.getOccurredAt());
+                entity.getOccurredAt(),
+                entity.getMediaStatus() == null ? null : new MediaDownload(entity.getMediaStatus(),
+                        entity.getMediaPath(), entity.getMediaAttempts(), entity.getMediaNextAttemptAt(),
+                        entity.getMediaError()));
     }
 
     public static MessagePersistenceEntity toPersistenceFromDomain(Message message) {
@@ -46,6 +50,14 @@ public final class MessagePersistenceAssembler {
         entity.setBody(message.getContent().body());
         entity.setMediaId(message.getContent().mediaId());
         entity.setMediaMime(message.getContent().mediaMime());
+        var media = message.getMedia();
+        if (media != null) {
+            entity.setMediaStatus(media.status());
+            entity.setMediaPath(media.path());
+            entity.setMediaAttempts((short) media.attempts());
+            entity.setMediaNextAttemptAt(media.nextAttemptAt());
+            entity.setMediaError(media.error());
+        }
         entity.setTemplateName(message.getTemplateName());
         entity.setTemplateParameters(message.getTemplateName() == null ? null
                 : message.getTemplateParameters().toArray(String[]::new));
