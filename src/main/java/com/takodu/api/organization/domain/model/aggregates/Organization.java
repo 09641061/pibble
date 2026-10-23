@@ -5,8 +5,10 @@ import com.takodu.api.organization.domain.model.valueobjects.Plan;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+import com.takodu.api.shared.domain.model.valueobjects.UserId;
 import lombok.Getter;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -17,8 +19,8 @@ import java.util.Objects;
 public class Organization {
     private final OrganizationId id;
     private String name;
-    private final Plan plan;
-    private final Instant planActiveUntil;
+    private Plan plan;
+    private Instant planActiveUntil;
     private final IdempotencyKey idempotencyKey;
     private IdempotencyKey lastIdempotencyKey;
 
@@ -71,6 +73,41 @@ public class Organization {
      */
     public void ensureCanAddEstablishment(int activeEstablishments) {
         if (!plan.allows(activeEstablishments)) throw new PlanLimitReachedException(plan);
+    }
+
+    /**
+     * O5: the Takodu team sets the plan after a payment. A downgrade to {@code standard} keeps every active
+     * establishment open; {@link #ensureCanAddEstablishment} stops new ones until the count is below the limit (O4).
+     * Setting a past instant ends the plan, for example after a reversed payment.
+     *
+     * @param newPlan the plan from now on
+     * @param newActiveUntil the end of the paid period
+     * @param changedBy the platform operator acting
+     * @param note how and when the business paid, such as {@code "Yape 2026-10-23"}
+     * @return the history entry to save in the same transaction
+     */
+    public PlanChange changePlan(Plan newPlan, Instant newActiveUntil, UserId changedBy, String note,
+                                 IdempotencyKey idempotencyKey, Instant now) {
+        Objects.requireNonNull(newPlan, "plan is required");
+        Objects.requireNonNull(newActiveUntil, "activeUntil is required");
+        var change = new PlanChange(null, id, changedBy, plan, newPlan, planActiveUntil, newActiveUntil, note,
+                idempotencyKey, now);
+        this.plan = newPlan;
+        this.planActiveUntil = newActiveUntil;
+        return change;
+    }
+
+    /**
+     * O5: extending by days counts from the current end while the plan is active, so paying early loses nothing, and
+     * from now once it has ended.
+     *
+     * @param days a positive number of days
+     * @return the new end of the paid period
+     */
+    public Instant planEndExtendedBy(int days, Instant now) {
+        if (days < 1) throw new IllegalArgumentException("Extend the plan by at least one day");
+        var from = isPlanActive(now) ? planActiveUntil : now;
+        return from.plus(Duration.ofDays(days));
     }
 
     /** Records the key of an ownership transfer, so a retry finds it already applied (O12). */
