@@ -16,6 +16,7 @@ Backend of Takodu: a Quarkus REST API (Java 25, PostgreSQL) organized as a modul
 - API: `http://localhost:8080/api/v1/...`
 - Swagger UI: `http://localhost:8080/q/swagger-ui`
 - Dev UI: `http://localhost:8080/q/dev-ui`
+- Health: `/q/health/live` and `/q/health/ready` (database and media volume), without a token ([decision](docs/decisions/implemented/2026-10-23-health-checks-cover-only-the-process.md)).
 - Sign in locally: `POST /api/v1/auth/login-codes` with any email; dev mode prints the code to the console instead of emailing it.
 - Invite a teammate locally: `POST /api/v1/members`; dev mode prints the invitation token, which the invitee sends to `POST /api/v1/invitation-acceptances` after signing in with the invited email.
 
