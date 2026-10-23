@@ -4,6 +4,7 @@ import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.model.valueobjects.WhatsappLineId;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
+import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import lombok.Getter;
@@ -14,7 +15,7 @@ import java.util.Objects;
 
 /**
  * W3: the chat between one line and one customer. It keeps only the summary its rules need (the window, the unread
- * count, the assignee and the assistant pause); messages are their own aggregate, so a chat is never loaded whole.
+ * count, the assignee and the assistant's pauses); messages are their own aggregate, so a chat is never loaded whole.
  */
 @Getter
 public class Conversation {
@@ -37,18 +38,22 @@ public class Conversation {
     private int unreadCount;
     private Instant assistantHandedOffAt;
     private String handoffSummary;
+    private Instant manuallyPausedAt;
+    private MemberId manuallyPausedBy;
+    private IdempotencyKey lastIdempotencyKey;
 
     /** @param firstMessageAt when the message that starts the conversation was sent */
     public static Conversation start(WhatsappLine line, CustomerId customerId, Instant firstMessageAt) {
         return new Conversation(null, line.getOrganizationId(), line.getEstablishmentId(), line.getId(), customerId,
-                null, null, null, firstMessageAt, 0, null, null);
+                null, null, null, firstMessageAt, 0, null, null, null, null, null);
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
     public Conversation(ConversationId id, OrganizationId organizationId, EstablishmentId establishmentId,
                         WhatsappLineId lineId, CustomerId customerId, MemberId assignedMemberId,
                         Instant assistantPausedUntil, Instant lastInboundAt, Instant lastMessageAt, int unreadCount,
-                        Instant assistantHandedOffAt, String handoffSummary) {
+                        Instant assistantHandedOffAt, String handoffSummary, Instant manuallyPausedAt,
+                        MemberId manuallyPausedBy, IdempotencyKey lastIdempotencyKey) {
         this.id = id;
         this.organizationId = Objects.requireNonNull(organizationId, "organizationId is required");
         this.establishmentId = Objects.requireNonNull(establishmentId, "establishmentId is required");
@@ -61,6 +66,9 @@ public class Conversation {
         this.unreadCount = unreadCount;
         this.assistantHandedOffAt = assistantHandedOffAt;
         this.handoffSummary = handoffSummary;
+        this.manuallyPausedAt = manuallyPausedAt;
+        this.manuallyPausedBy = manuallyPausedBy;
+        this.lastIdempotencyKey = lastIdempotencyKey;
     }
 
     /** W6, W8: the customer wrote; the window reopens and staff have one more message to read. */
@@ -115,6 +123,42 @@ public class Conversation {
         return assistantHandedOffAt != null;
     }
 
+    /**
+     * A3, 08 §6: a member stops the assistant on this chat until someone resumes it. Unlike a handoff, staff are
+     * already looking, so it changes no unread count and needs no reason; it records who paused it, and a second
+     * pause keeps the first.
+     */
+    public void pauseAssistant(MemberId by, Instant now, IdempotencyKey idempotencyKey) {
+        if (manuallyPausedAt == null) {
+            manuallyPausedAt = now;
+            manuallyPausedBy = Objects.requireNonNull(by, "A pause records who paused it");
+        }
+        lastIdempotencyKey = idempotencyKey;
+    }
+
+    /**
+     * A3, A7: the assistant answers again from the customer's next message. It clears every pause: the 12-hour one
+     * after a human message, a manual pause and a handoff with its summary.
+     */
+    public void resumeAssistant(IdempotencyKey idempotencyKey) {
+        assistantPausedUntil = null;
+        manuallyPausedAt = null;
+        manuallyPausedBy = null;
+        assistantHandedOffAt = null;
+        handoffSummary = null;
+        lastIdempotencyKey = idempotencyKey;
+    }
+
+    /** @return whether a member paused the assistant and nobody resumed it yet */
+    public boolean isManuallyPaused() {
+        return manuallyPausedAt != null;
+    }
+
+    /** @return whether this key already paused or resumed the assistant, so a retried tap changes nothing */
+    public boolean alreadyApplied(IdempotencyKey idempotencyKey) {
+        return idempotencyKey.equals(lastIdempotencyKey);
+    }
+
     /** W6: the single source of truth for whether free-form messages may be sent. */
     public boolean isWindowOpen(Instant now) {
         return lastInboundAt != null && now.isBefore(windowClosesAt());
@@ -125,9 +169,10 @@ public class Conversation {
         return lastInboundAt == null ? null : lastInboundAt.plus(SERVICE_WINDOW);
     }
 
-    /** A3, A7: a person wrote less than 12 hours ago, or the assistant handed the chat off. */
+    /** A3, A7: a person wrote less than 12 hours ago, a member paused it, or the assistant handed the chat off. */
     public boolean isAssistantPaused(Instant now) {
-        return isHandedOff() || assistantPausedUntil != null && now.isBefore(assistantPausedUntil);
+        return isHandedOff() || isManuallyPaused()
+                || assistantPausedUntil != null && now.isBefore(assistantPausedUntil);
     }
 
     /** W8 */

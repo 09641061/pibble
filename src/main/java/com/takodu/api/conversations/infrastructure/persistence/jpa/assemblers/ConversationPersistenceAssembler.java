@@ -6,6 +6,7 @@ import com.takodu.api.conversations.domain.model.valueobjects.WhatsappLineId;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.entities.ConversationPersistenceEntity;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
+import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 
@@ -18,7 +19,9 @@ public final class ConversationPersistenceAssembler {
                 new CustomerId(entity.getCustomerId()),
                 entity.getAssignedMemberId() == null ? null : new MemberId(entity.getAssignedMemberId()),
                 entity.getBotPausedUntil(), entity.getLastInboundAt(), entity.getLastMessageAt(), entity.getUnreadCount(),
-                entity.getAssistantHandedOffAt(), entity.getHandoffSummary());
+                entity.getAssistantHandedOffAt(), entity.getHandoffSummary(), entity.getManuallyPausedAt(),
+                entity.getManuallyPausedBy() == null ? null : new MemberId(entity.getManuallyPausedBy()),
+                entity.getLastIdempotencyKey() == null ? null : new IdempotencyKey(entity.getLastIdempotencyKey()));
     }
 
     public static ConversationPersistenceEntity toPersistenceFromDomain(Conversation conversation) {
@@ -36,6 +39,11 @@ public final class ConversationPersistenceAssembler {
         entity.setUnreadCount(conversation.getUnreadCount());
         entity.setAssistantHandedOffAt(conversation.getAssistantHandedOffAt());
         entity.setHandoffSummary(conversation.getHandoffSummary());
+        entity.setManuallyPausedAt(conversation.getManuallyPausedAt());
+        entity.setManuallyPausedBy(conversation.getManuallyPausedBy() == null ? null
+                : conversation.getManuallyPausedBy().value());
+        entity.setLastIdempotencyKey(conversation.getLastIdempotencyKey() == null ? null
+                : conversation.getLastIdempotencyKey().value());
         return entity;
     }
 }

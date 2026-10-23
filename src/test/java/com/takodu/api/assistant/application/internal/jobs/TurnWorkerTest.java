@@ -309,6 +309,48 @@ class TurnWorkerTest {
     }
 
     @Test
+    void manuallyPausedChatGetsNoTurnUntilResumed() {
+        var conversationId = customerSays("Hola");
+        assistant(conversationId, "pause");
+        run();
+        assertEquals("A person is handling the chat", turnsOf(conversationId).getFirst().get("error"));
+
+        clock.advance(Duration.ofHours(13));
+        customerSays("¿Hay alguien?");
+        assertEquals(1, turnsOf(conversationId).size());
+
+        assistant(conversationId, "resume");
+        clock.advance(Duration.ofMinutes(1));
+        customerSays("Quiero una cita");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(reply("¡Claro! ¿Para qué servicio?"));
+        run();
+
+        assertEquals(2, turnsOf(conversationId).size());
+        assertEquals(List.of("¡Claro! ¿Para qué servicio?"), gateway.sentTo(waId));
+    }
+
+    @Test
+    void resumingAHandedOffChatLetsTheAssistantAnswerAgain() {
+        var conversationId = customerSays("Quiero hablar con alguien");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(tool("handOffToHuman", "{\"summary\": \"Pide una persona\"}"), reply("Claro."));
+        run();
+        clock.advance(Duration.ofMinutes(1));
+        customerSays("¿Hola?");
+        assertEquals(1, turnsOf(conversationId).size());
+
+        assistant(conversationId, "resume");
+        clock.advance(Duration.ofMinutes(1));
+        customerSays("Ya no, mejor agéndame");
+        clock.advance(Duration.ofSeconds(5));
+        model.script(reply("¿Qué servicio?"));
+        run();
+
+        assertEquals(List.of("Claro.", "¿Qué servicio?"), gateway.sentTo(waId));
+    }
+
+    @Test
     void threeFailuresHandTheChatToAPerson() {
         var conversationId = customerSays("Hola");
         for (int attempt = 1; attempt <= 3; attempt++) {
@@ -366,6 +408,11 @@ class TurnWorkerTest {
         MetaWebhooks.post(MetaWebhooks.payload(payload, Map.of("PHONE_NUMBER_ID", line, "WA_ID", waId,
                 "WAMID", MetaWebhooks.newWamid(), "TIMESTAMP", String.valueOf(clock.instant().getEpochSecond()),
                 "BODY", title))).statusCode(200);
+    }
+
+    private void assistant(UUID conversationId, String action) {
+        given().spec(salon.owner().spec()).header("Idempotency-Key", UUID.randomUUID().toString())
+                .post("/api/v1/conversations/" + conversationId + "/assistant/" + action).then().statusCode(200);
     }
 
     private void run() {

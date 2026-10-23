@@ -7,6 +7,8 @@ import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.commands.AssignConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.HandOffConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
+import com.takodu.api.conversations.domain.model.commands.PauseAssistantCommand;
+import com.takodu.api.conversations.domain.model.commands.ResumeAssistantCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
@@ -59,6 +61,24 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
 
     @Override
     @Transactional
+    public Conversation handle(PauseAssistantCommand command) {
+        var conversation = lock(command.organizationId(), command.conversationId());
+        if (conversation.alreadyApplied(command.idempotencyKey())) return conversation;
+        conversation.pauseAssistant(command.pausedBy(), clock.instant(), command.idempotencyKey());
+        return save(conversation);
+    }
+
+    @Override
+    @Transactional
+    public Conversation handle(ResumeAssistantCommand command) {
+        var conversation = lock(command.organizationId(), command.conversationId());
+        if (conversation.alreadyApplied(command.idempotencyKey())) return conversation;
+        conversation.resumeAssistant(command.idempotencyKey());
+        return save(conversation);
+    }
+
+    @Override
+    @Transactional
     public Conversation handle(HandOffConversationCommand command) {
         var conversation = conversationRepository.lockById(command.organizationId(), command.conversationId())
                 .orElseThrow(() -> new ConversationNotFoundException(command.conversationId()));
@@ -66,7 +86,7 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
         return save(conversation);
     }
 
-    /** Other members' inboxes follow the change (W8, W9). */
+    /** Other members' inboxes follow the change (W8, W9, A3). */
     private Conversation save(Conversation conversation) {
         var saved = conversationRepository.save(conversation);
         conversationChanged.fire(new ConversationChangedEvent(saved.getOrganizationId(), saved.getEstablishmentId(),

@@ -9,11 +9,11 @@ The assistant answers customers on the establishment's WhatsApp line and books i
 
 ## Rules that do not bend
 
-1. **The model never chooses the tenant.** `TurnScope` binds organization, establishment, conversation and customer from the turn before the model runs. **No `@Tool` method takes an organization, establishment, customer, member or appointment id**; `ArchitectureTest` rejects `UUID` and `*Id` types and parameters named `*Id`. Tools take names, local dates and times, and the position of an appointment in the last `myAppointments` list.
+1. **The model never chooses the tenant.** `TurnScope` binds organization, establishment, conversation and customer from the turn before the model runs. **No `@Tool` method takes an organization, establishment, customer, member or appointment id**; `ArchitectureTest` rejects `UUID` and `*Id` types and parameters named `*Id`. Tools take names, local dates and times, and an appointment's position in the last `myAppointments` list.
 2. **Same rules as staff.** Every write goes through `ExternalBookingService` → `BookingContextFacade`, which runs `AvailabilityPolicy` and the database constraints. Cut-offs (30 minutes lead, 60 days ahead, 2 hours before a change) live in `booking`, never only in the prompt.
 3. **Tools, not knowledge.** Services, prices, hours and free slots come from a tool call or the owner's business info; the prompt forbids inventing them.
-4. **One mechanism.** LangChain4j tool calling in process. No keyword router, no parsing tool calls out of text, no MCP.
-5. **Humans win.** Any human message pauses the assistant on that conversation (A3); the assistant never answers a paused conversation.
+4. **One mechanism.** LangChain4j tool calling in process; no keyword router, no MCP.
+5. **Humans win.** A human message pauses the assistant 12 hours (A3); staff pause it until resumed (`/assistant/pause`), and `/assistant/resume` clears every pause and a handoff. A paused conversation gets no turn.
 
 ## Where things live
 
@@ -57,7 +57,7 @@ public String findSlots(String serviceName, String date,
 - **Business failures are returned as text, never thrown**: map the context exception to the reason plus the next step ("Ese horario ya no está disponible. Horarios libres: 10:30, 11:00"). Only infrastructure errors fail the turn.
 - A request past the B14 cut-off, a complaint, a request for a person, unreadable media or two failed attempts ends with `handOffToHuman(summary)` (A7).
 - Every write tool passes an `IdempotencyKey` derived from `scope.turnId()`, the tool name and its arguments, so a retried turn never books, reschedules or cancels twice.
-- Never put the customer's phone number in a tool result or the prompt.
+- Never put the customer's phone in a tool result or the prompt.
 
 ## Reply rendering
 

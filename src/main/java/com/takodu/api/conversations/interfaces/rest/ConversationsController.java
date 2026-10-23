@@ -5,17 +5,21 @@ import com.takodu.api.conversations.application.queryservices.ConversationQueryS
 import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundException;
 import com.takodu.api.conversations.domain.model.commands.AssignConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
+import com.takodu.api.conversations.domain.model.commands.PauseAssistantCommand;
+import com.takodu.api.conversations.domain.model.commands.ResumeAssistantCommand;
 import com.takodu.api.conversations.domain.model.queries.GetConversationByIdQuery;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.interfaces.rest.resources.AssignConversationResource;
 import com.takodu.api.conversations.interfaces.rest.resources.ConversationResource;
 import com.takodu.api.conversations.interfaces.rest.transform.ConversationResourceFromEntityAssembler;
 import com.takodu.api.shared.application.tenancy.TenantContext;
+import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.MemberId;
 import com.takodu.api.shared.interfaces.rest.idempotency.WithoutIdempotencyKey;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -73,6 +77,39 @@ public class ConversationsController {
         return get(conversationId);
     }
 
+    @POST
+    @Path("/{conversationId}/assistant/pause")
+    @Operation(summary = "Pause the assistant", description = "Keeps the assistant quiet on this chat until someone"
+            + " resumes it (A3), recording who paused it. Works while the plan is inactive.")
+    @APIResponse(responseCode = "200", description = "The conversation",
+            content = @Content(schema = @Schema(implementation = ConversationResource.class)))
+    @APIResponse(responseCode = "400", description = "Missing Idempotency-Key")
+    @APIResponse(responseCode = "403", description = "Staff not assigned to its establishment")
+    @APIResponse(responseCode = "404", description = "Conversation not in the organization")
+    public ConversationResource pauseAssistant(@HeaderParam("Idempotency-Key") UUID idempotencyKey,
+                                               @PathParam("conversationId") UUID conversationId) {
+        conversationCommandService.handle(new PauseAssistantCommand(tenantContext.organizationId(),
+                new ConversationId(conversationId), tenantContext.memberId(), key(idempotencyKey)));
+        return get(conversationId);
+    }
+
+    @POST
+    @Path("/{conversationId}/assistant/resume")
+    @Operation(summary = "Resume the assistant", description = "Clears the 12-hour pause after a human message, a"
+            + " manual pause and a handoff (A3, A7); the assistant answers the customer's next message. Works while"
+            + " the plan is inactive.")
+    @APIResponse(responseCode = "200", description = "The conversation",
+            content = @Content(schema = @Schema(implementation = ConversationResource.class)))
+    @APIResponse(responseCode = "400", description = "Missing Idempotency-Key")
+    @APIResponse(responseCode = "403", description = "Staff not assigned to its establishment")
+    @APIResponse(responseCode = "404", description = "Conversation not in the organization")
+    public ConversationResource resumeAssistant(@HeaderParam("Idempotency-Key") UUID idempotencyKey,
+                                                @PathParam("conversationId") UUID conversationId) {
+        conversationCommandService.handle(new ResumeAssistantCommand(tenantContext.organizationId(),
+                new ConversationId(conversationId), key(idempotencyKey)));
+        return get(conversationId);
+    }
+
     @PUT
     @Path("/{conversationId}/assignee")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -88,5 +125,9 @@ public class ConversationsController {
         conversationCommandService.handle(new AssignConversationCommand(tenantContext.organizationId(),
                 new ConversationId(conversationId), memberId));
         return get(conversationId);
+    }
+
+    private static IdempotencyKey key(UUID idempotencyKey) {
+        return idempotencyKey == null ? null : new IdempotencyKey(idempotencyKey);
     }
 }
