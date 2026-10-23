@@ -1,6 +1,7 @@
 package com.takodu.api.iam.domain.model.aggregates;
 
 import com.takodu.api.iam.domain.exceptions.UserDisabledException;
+import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
 import com.takodu.api.shared.domain.model.valueobjects.Email;
 import com.takodu.api.shared.domain.model.valueobjects.UserId;
 import lombok.Getter;
@@ -19,6 +20,7 @@ public class User {
     private final String name;
     private final Instant disabledAt;
     private Instant lastLoginAt;
+    private final boolean platformOperator;
 
     /**
      * I4: the first successful sign-in creates the user.
@@ -27,16 +29,21 @@ public class User {
      * @return a new user without a name
      */
     public static User register(Email email) {
-        return new User(null, email, null, null, null);
+        return new User(null, email, null, null, null, false);
     }
 
-    /** Rehydration constructor; only persistence assemblers call it. */
-    public User(UserId id, Email email, String name, Instant disabledAt, Instant lastLoginAt) {
+    /**
+     * Rehydration constructor; only persistence assemblers call it.
+     *
+     * @param platformOperator whether the user is on the Takodu team, which only the database grants
+     */
+    public User(UserId id, Email email, String name, Instant disabledAt, Instant lastLoginAt, boolean platformOperator) {
         this.id = id;
         this.email = Objects.requireNonNull(email, "email is required");
         this.name = name;
         this.disabledAt = disabledAt;
         this.lastLoginAt = lastLoginAt;
+        this.platformOperator = platformOperator;
     }
 
     /**
@@ -55,5 +62,16 @@ public class User {
      */
     public void requireEnabled() {
         if (disabledAt != null) throw new UserDisabledException();
+    }
+
+    /**
+     * The internal API is for the Takodu team only (03 §2).
+     *
+     * @throws UserDisabledException when the user is disabled (I6)
+     * @throws AccessDeniedException when the user is not a platform operator
+     */
+    public void requirePlatformOperator() {
+        requireEnabled();
+        if (!platformOperator) throw new AccessDeniedException("use the internal API");
     }
 }

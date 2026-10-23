@@ -5,8 +5,10 @@ import com.takodu.api.organization.domain.model.valueobjects.Plan;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
+import com.takodu.api.shared.domain.model.valueobjects.UserId;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -60,6 +62,42 @@ class OrganizationTest {
     @Test
     void maxAllowsManyEstablishments() {
         assertDoesNotThrow(() -> organization(Plan.MAX, NOW.plusSeconds(60)).ensureCanAddEstablishment(40));
+    }
+
+    @Test
+    void changingThePlanRecordsWhereItCameFrom() {
+        var organization = organization(Plan.MAX, NOW);
+        var operator = new UserId(UUID.randomUUID());
+        var until = NOW.plus(Duration.ofDays(30));
+
+        var change = organization.changePlan(Plan.STANDARD, until, operator, " Yape 2026-10-23 ",
+                new IdempotencyKey(UUID.randomUUID()), NOW);
+
+        assertEquals(Plan.STANDARD, organization.getPlan());
+        assertEquals(until, organization.getPlanActiveUntil());
+        assertEquals(Plan.MAX, change.getFromPlan());
+        assertEquals(NOW, change.getFromActiveUntil());
+        assertEquals(operator, change.getChangedBy());
+        assertEquals("Yape 2026-10-23", change.getNote());
+    }
+
+    @Test
+    void aPlanChangeNeedsANote() {
+        var organization = organization(Plan.STANDARD, NOW);
+
+        assertThrows(IllegalArgumentException.class, () -> organization.changePlan(Plan.MAX, NOW,
+                new UserId(UUID.randomUUID()), " ", new IdempotencyKey(UUID.randomUUID()), NOW));
+        assertEquals(Plan.STANDARD, organization.getPlan());
+    }
+
+    @Test
+    void extendingCountsFromTheEndWhileActiveAndFromNowAfter() {
+        var active = organization(Plan.STANDARD, NOW.plus(Duration.ofDays(5)));
+        var ended = organization(Plan.STANDARD, NOW.minus(Duration.ofDays(5)));
+
+        assertEquals(NOW.plus(Duration.ofDays(35)), active.planEndExtendedBy(30, NOW));
+        assertEquals(NOW.plus(Duration.ofDays(30)), ended.planEndExtendedBy(30, NOW));
+        assertThrows(IllegalArgumentException.class, () -> active.planEndExtendedBy(0, NOW));
     }
 
     private static Organization organization(Plan plan, Instant activeUntil) {

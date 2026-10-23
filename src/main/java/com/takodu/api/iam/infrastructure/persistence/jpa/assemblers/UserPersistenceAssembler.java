@@ -9,7 +9,7 @@ public final class UserPersistenceAssembler {
 
     public static User toDomainFromPersistence(UserPersistenceEntity entity) {
         return new User(new UserId(entity.getId()), entity.getEmail(), entity.getName(), entity.getDisabledAt(),
-                entity.getLastLoginAt());
+                entity.getLastLoginAt(), entity.isPlatformOperator());
     }
 
     public static UserPersistenceEntity toPersistenceFromDomain(User user) {
@@ -19,6 +19,7 @@ public final class UserPersistenceAssembler {
         entity.setName(user.getName());
         entity.setDisabledAt(user.getDisabledAt());
         entity.setLastLoginAt(user.getLastLoginAt());
+        entity.setPlatformOperator(user.isPlatformOperator());
         return entity;
     }
 }
