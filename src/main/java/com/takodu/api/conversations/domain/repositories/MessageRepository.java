@@ -2,6 +2,7 @@ package com.takodu.api.conversations.domain.repositories;
 
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.PageCursor;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
@@ -19,6 +20,8 @@ public interface MessageRepository {
 
     @CrossTenant("A status webhook updates the message it reports on; the message carries its organization")
     Optional<Message> lockByWamid(Wamid wamid);
+
+    Optional<Message> findById(OrganizationId organizationId, MessageId messageId);
 
     Optional<Message> findByIdempotencyKey(OrganizationId organizationId, IdempotencyKey idempotencyKey);
 

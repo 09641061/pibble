@@ -16,6 +16,10 @@ public class MessagePersistenceRepository implements PanacheRepositoryBase<Messa
         return count("wamid", wamid) > 0;
     }
 
+    public Optional<MessagePersistenceEntity> findById(UUID organizationId, UUID id) {
+        return find("organizationId = ?1 and id = ?2", organizationId, id).firstResultOptional();
+    }
+
     public Optional<MessagePersistenceEntity> findByIdempotencyKey(UUID organizationId, UUID key) {
         return find("organizationId = ?1 and idempotencyKey = ?2", organizationId, key).firstResultOptional();
     }

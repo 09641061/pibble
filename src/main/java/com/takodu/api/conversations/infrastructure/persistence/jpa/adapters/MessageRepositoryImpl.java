@@ -2,6 +2,7 @@ package com.takodu.api.conversations.infrastructure.persistence.jpa.adapters;
 
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.PageCursor;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.conversations.domain.repositories.MessageRepository;
@@ -35,6 +36,12 @@ public class MessageRepositoryImpl implements MessageRepository {
     @Override
     public Optional<Message> lockByWamid(Wamid wamid) {
         return messagePersistenceRepository.lockByWamid(wamid.value())
+                .map(MessagePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<Message> findById(OrganizationId organizationId, MessageId messageId) {
+        return messagePersistenceRepository.findById(organizationId.value(), messageId.value())
                 .map(MessagePersistenceAssembler::toDomainFromPersistence);
     }
 

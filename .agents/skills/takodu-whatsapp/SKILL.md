@@ -65,7 +65,7 @@ Limits checked when queued: text ≤ 4,096 characters, interactive body ≤ 1,02
 - The business token is stored only encrypted, decrypted only in the Meta adapters, and never returned by an endpoint.
 - **Never log message bodies, phone numbers or tokens.** Log `wamid`, line id and status.
 - Webhook payloads are untrusted: validate them and ignore what matches no line.
-- Media is served only through an authenticated endpoint that checks the caller can see the establishment.
+- Media is served only by `GET /api/v1/media/{messageId}`, to members who see the establishment (409 downloading, 422 failed).
 
 ## Tests
 
