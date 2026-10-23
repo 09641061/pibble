@@ -6,6 +6,7 @@ import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.PageCursor;
 import com.takodu.api.conversations.domain.model.valueobjects.Wamid;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
+import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import com.takodu.api.shared.domain.repositories.CrossTenant;
 
@@ -42,6 +43,16 @@ public interface MessageRepository {
      */
     @CrossTenant("The media job claims due downloads of every organization; the message carries its organization")
     Optional<Message> claimNextMediaDue(Instant now);
+
+    /**
+     * Locks the message whose media goes first with {@code FOR UPDATE SKIP LOCKED}: media whose customer was deleted,
+     * then media that arrived before {@code expiredBefore} and is not removed yet.
+     */
+    @CrossTenant("The retention job removes media of every organization; the message carries its organization")
+    Optional<Message> claimNextMediaRemoval(Instant expiredBefore);
+
+    /** @return the customer's messages, in every conversation, whose media is not removed or being removed */
+    List<Message> findMediaToRemove(OrganizationId organizationId, CustomerId customerId);
 
     /**
      * @throws com.takodu.api.shared.domain.exceptions.RequestInProgressException when a concurrent request with the

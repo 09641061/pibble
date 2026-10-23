@@ -66,6 +66,18 @@ class MediaDownloadTest {
         assertEquals(100L * 1024 * 1024, MediaDownload.maxBytes(MessageKind.DOCUMENT));
     }
 
+    @Test
+    void removalKeepsThePathUntilTheFileIsDeleted() {
+        var removing = pending().stored("org/message").removalRequested();
+
+        assertEquals(MediaStatus.REMOVING, removing.status());
+        assertEquals("org/message", removing.path());
+        assertEquals(removing, removing.removalRequested());
+        assertEquals(MediaStatus.REMOVED, removing.removed().status());
+        assertNull(removing.removed().path());
+        assertThrows(IllegalStateException.class, () -> removing.removed().stored("a"));
+    }
+
     private static MediaDownload pending() {
         return MediaDownload.of(new MessageContent(MessageKind.AUDIO, null, "123", "audio/ogg"), NOW);
     }

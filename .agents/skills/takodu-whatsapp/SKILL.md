@@ -40,7 +40,7 @@ Meta's JSON never leaves `infrastructure.meta`: the controller passes the raw bo
 | Account or partner removed | `WhatsappLine.disconnect()` | Line shown as disconnected |
 | Template status | `WhatsappLine.recordTemplateStatus` on the WABA's connected lines | Notifications wait until approved |
 
-A tapped button or list row is an inbound `interactive` (or template `button`) message with the title in `body`. Unknown kinds are stored as `unsupported`, never dropped. Media keeps `media_id`; `MediaDownloader` later stores the file through `MediaStorage` at `<organization>/<message>` under `MEDIA_DIR`, within Meta's size limits, with `media_status` and at most 5 attempts.
+A tapped button or list row is an inbound `interactive` (or template `button`) message with the title in `body`. Unknown kinds are stored as `unsupported`, never dropped. Media keeps `media_id`; `MediaDownloader` stores the file through `MediaStorage` at `<organization>/<message>` under `MEDIA_DIR`, within Meta's size limits, at most 5 attempts; `MediaRetentionJob` deletes it later.
 
 ## Sending
 
@@ -64,8 +64,8 @@ Limits checked when queued: text ≤ 4,096 characters, interactive body ≤ 1,02
 
 - The business token is stored only encrypted, decrypted only in the Meta adapters, and never returned by an endpoint.
 - **Never log message bodies, phone numbers or tokens.** Log `wamid`, line id and status.
-- Webhook payloads are untrusted: validate them and ignore what matches no line.
-- Media is served only by `GET /api/v1/media/{messageId}`, to members who see the establishment (409 downloading, 422 failed).
+- Webhook payloads are untrusted: validate them; ignore what matches no line.
+- Media is served only by `GET /api/v1/media/{messageId}`, to members who see the establishment (409 downloading, 422 failed, 404 `MEDIA_REMOVED`).
 
 ## Tests
 

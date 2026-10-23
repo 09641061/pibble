@@ -10,6 +10,7 @@ import com.takodu.api.conversations.infrastructure.persistence.jpa.assemblers.Me
 import com.takodu.api.conversations.infrastructure.persistence.jpa.repositories.MessagePersistenceRepository;
 import com.takodu.api.shared.domain.exceptions.RequestInProgressException;
 import com.takodu.api.shared.domain.model.valueobjects.IdempotencyKey;
+import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.hibernate.exception.ConstraintViolationException;
@@ -63,6 +64,18 @@ public class MessageRepositoryImpl implements MessageRepository {
     @Override
     public Optional<Message> claimNextPending(Instant now) {
         return messagePersistenceRepository.claimNextPending(now).map(MessagePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public Optional<Message> claimNextMediaRemoval(Instant expiredBefore) {
+        return messagePersistenceRepository.claimNextMediaRemoval(expiredBefore)
+                .map(MessagePersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<Message> findMediaToRemove(OrganizationId organizationId, CustomerId customerId) {
+        return messagePersistenceRepository.findMediaToRemove(organizationId.value(), customerId.value()).stream()
+                .map(MessagePersistenceAssembler::toDomainFromPersistence).toList();
     }
 
     @Override

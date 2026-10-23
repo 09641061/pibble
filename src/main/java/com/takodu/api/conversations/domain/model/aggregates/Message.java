@@ -222,6 +222,16 @@ public class Message {
         media = requireMedia().failed(why, retryable, now);
     }
 
+    /** C5: the customer was deleted; the retention job deletes the file. */
+    public void requestMediaRemoval() {
+        media = requireMedia().removalRequested();
+    }
+
+    /** The retention job deleted the file, or there was none to delete. */
+    public void recordMediaRemoved() {
+        media = requireMedia().removed();
+    }
+
     /** @return the download's state, or null when the message carries no media */
     public MediaStatus mediaStatus() {
         return media == null ? null : media.status();
