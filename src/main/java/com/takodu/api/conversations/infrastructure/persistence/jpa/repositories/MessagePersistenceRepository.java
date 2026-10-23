@@ -46,6 +46,20 @@ public class MessagePersistenceRepository implements PanacheRepositoryBase<Messa
         return claimed.stream().findFirst();
     }
 
+    /** Uses {@code messages_media_due_idx}; {@code SKIP LOCKED} as for the outbox. */
+    public Optional<MessagePersistenceEntity> claimNextMediaDue(Instant now) {
+        @SuppressWarnings("unchecked")
+        List<MessagePersistenceEntity> claimed = getEntityManager().createNativeQuery("""
+                        SELECT * FROM messages
+                        WHERE media_status = 'pending' AND media_next_attempt_at <= :now
+                        ORDER BY media_next_attempt_at, id
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED""", MessagePersistenceEntity.class)
+                .setParameter("now", now)
+                .getResultList();
+        return claimed.stream().findFirst();
+    }
+
     public Optional<MessagePersistenceEntity> lockByWamid(String wamid) {
         return find("wamid", wamid).withLock(LockModeType.PESSIMISTIC_WRITE).firstResultOptional();
     }

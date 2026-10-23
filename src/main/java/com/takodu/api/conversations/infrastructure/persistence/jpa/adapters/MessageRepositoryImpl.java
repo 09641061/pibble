@@ -58,6 +58,12 @@ public class MessageRepositoryImpl implements MessageRepository {
         return messagePersistenceRepository.claimNextPending(now).map(MessagePersistenceAssembler::toDomainFromPersistence);
     }
 
+    @Override
+    public Optional<Message> claimNextMediaDue(Instant now) {
+        return messagePersistenceRepository.claimNextMediaDue(now)
+                .map(MessagePersistenceAssembler::toDomainFromPersistence);
+    }
+
     /** A duplicate wamid cannot reach here: writers lock the conversation and check the wamid first (W4). */
     @Override
     public Message save(Message message) {

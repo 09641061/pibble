@@ -76,6 +76,13 @@ public interface MetaGraphClient {
     JsonNode sendMessage(@PathParam("version") String version, @PathParam("phoneNumberId") String phoneNumberId,
                          @HeaderParam("Authorization") String authorization, Map<String, Object> payload);
 
+    /** @param phoneNumberId Meta answers only when the media reached this number */
+    @GET
+    @Path("/{version}/{mediaId}")
+    MediaResponse fetchMedia(@PathParam("version") String version, @PathParam("mediaId") String mediaId,
+                             @QueryParam("phone_number_id") String phoneNumberId,
+                             @HeaderParam("Authorization") String authorization);
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     record AccessTokenResponse(@JsonProperty("access_token") String accessToken) { }
 
@@ -88,6 +95,11 @@ public interface MetaGraphClient {
     /** The creation response carries only {@code id}, {@code status} and {@code category}. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record TemplateResponse(String id, String name, String language, String status) { }
+
+    /** @param url valid for 5 minutes, fetched with the same token */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record MediaResponse(String url, @JsonProperty("mime_type") String mimeType,
+                         @JsonProperty("file_size") Long fileSize) { }
 
     record AppDataRequest(@JsonProperty("messaging_product") String messagingProduct,
                           @JsonProperty("sync_type") String syncType) { }

@@ -17,6 +17,7 @@ import com.takodu.api.conversations.domain.model.commands.RecordInboundMessageCo
 import com.takodu.api.conversations.domain.model.commands.RecordTemplateStatusCommand;
 import com.takodu.api.conversations.domain.model.commands.VerifyWhatsappWebhookCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
+import com.takodu.api.conversations.domain.model.events.MediaReceivedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.conversations.domain.repositories.MessageRepository;
@@ -41,6 +42,7 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
     private final ExternalCustomersService externalCustomersService;
     private final Event<InboundMessageReceivedIntegrationEvent> inboundMessageReceived;
     private final Event<ConversationChangedEvent> conversationChanged;
+    private final Event<MediaReceivedEvent> mediaReceived;
 
     public WhatsappWebhookCommandServiceImpl(WhatsappWebhookReader whatsappWebhookReader,
                                              WhatsappLineRepository whatsappLineRepository,
@@ -48,7 +50,8 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
                                              MessageRepository messageRepository,
                                              ExternalCustomersService externalCustomersService,
                                              Event<InboundMessageReceivedIntegrationEvent> inboundMessageReceived,
-                                             Event<ConversationChangedEvent> conversationChanged) {
+                                             Event<ConversationChangedEvent> conversationChanged,
+                                             Event<MediaReceivedEvent> mediaReceived) {
         this.whatsappWebhookReader = whatsappWebhookReader;
         this.whatsappLineRepository = whatsappLineRepository;
         this.conversationRepository = conversationRepository;
@@ -56,6 +59,7 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
         this.externalCustomersService = externalCustomersService;
         this.inboundMessageReceived = inboundMessageReceived;
         this.conversationChanged = conversationChanged;
+        this.mediaReceived = mediaReceived;
     }
 
     @Override
@@ -94,8 +98,7 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
                 command.customerWaId(), command.profileName());
         var conversation = conversationRepository.lockOrStart(line.get(), customerId, command.occurredAt());
         if (messageRepository.existsByWamid(command.wamid())) return Optional.empty();
-        var message = messageRepository.save(Message.inbound(conversation, command.wamid(), command.content(),
-                command.occurredAt()));
+        var message = store(Message.inbound(conversation, command.wamid(), command.content(), command.occurredAt()));
         conversation.recordInbound(command.occurredAt());
         conversationRepository.save(conversation);
         inboundMessageReceived.fire(new InboundMessageReceivedIntegrationEvent(conversation.getOrganizationId().value(),
@@ -109,8 +112,7 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
     private Optional<Conversation> record(RecordBusinessAppEchoCommand command) {
         var conversation = conversationOf(command.phoneNumberId(), command.customerWaId(), command.occurredAt());
         if (conversation.isEmpty() || messageRepository.existsByWamid(command.wamid())) return Optional.empty();
-        messageRepository.save(Message.businessAppEcho(conversation.get(), command.wamid(), command.content(),
-                command.occurredAt()));
+        store(Message.businessAppEcho(conversation.get(), command.wamid(), command.content(), command.occurredAt()));
         conversation.get().recordHumanOutbound(command.occurredAt());
         return Optional.of(conversationRepository.save(conversation.get()));
     }
@@ -119,10 +121,17 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
     private Optional<Conversation> record(RecordHistoryMessageCommand command) {
         var conversation = conversationOf(command.phoneNumberId(), command.customerWaId(), command.occurredAt());
         if (conversation.isEmpty() || messageRepository.existsByWamid(command.wamid())) return Optional.empty();
-        messageRepository.save(Message.history(conversation.get(), command.wamid(), command.content(),
+        store(Message.history(conversation.get(), command.wamid(), command.content(),
                 command.fromCustomer(), command.status(), command.occurredAt()));
         conversation.get().recordHistory(command.occurredAt());
         return Optional.of(conversationRepository.save(conversation.get()));
+    }
+
+    /** Media is downloaded later by the media job, never in the webhook (07 §4). */
+    private Message store(Message message) {
+        var stored = messageRepository.save(message);
+        if (stored.getMedia() != null) mediaReceived.fire(new MediaReceivedEvent(stored.getId()));
+        return stored;
     }
 
     /** W10: statuses for messages Takodu does not know, such as ones sent before the line connected, are ignored. */

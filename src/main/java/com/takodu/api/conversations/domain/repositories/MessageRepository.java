@@ -34,6 +34,13 @@ public interface MessageRepository {
     Optional<Message> claimNextPending(Instant now);
 
     /**
+     * Locks the message whose media download is due first by {@code now} with {@code FOR UPDATE SKIP LOCKED}, so two
+     * media jobs never download the same file.
+     */
+    @CrossTenant("The media job claims due downloads of every organization; the message carries its organization")
+    Optional<Message> claimNextMediaDue(Instant now);
+
+    /**
      * @throws com.takodu.api.shared.domain.exceptions.RequestInProgressException when a concurrent request with the
      *         same key inserted first
      */

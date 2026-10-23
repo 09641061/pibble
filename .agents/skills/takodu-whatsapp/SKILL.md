@@ -7,7 +7,7 @@ description: How the pibble conversations context integrates the Meta WhatsApp C
 
 WhatsApp is the core of the product: **a customer message is never lost and never stored twice.** All Meta code lives in `conversations`. The decisions are [official Cloud API with coexistence](../../../docs/decisions/implemented/2026-10-19-official-whatsapp-cloud-api-with-coexistence.md), [webhooks store first](../../../docs/decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md) and [message as its own aggregate](../../../docs/decisions/implemented/2026-10-19-message-as-its-own-aggregate.md). The product design is `../docs/07-whatsapp-integration.md`; rules W1–W15 are in `../docs/03-business-domain.md` §4.5.
 
-Meta changes field names, limits and error codes often. **Check every Meta detail against Meta's current documentation when you implement it**, pin the Graph API version in configuration (`takodu.meta.graph-version`), and keep each detail in the one class that owns it.
+Meta changes field names, limits and error codes often. **Check every Meta detail against Meta's current docs when you implement it**, pin the Graph API version (`takodu.meta.graph-version`), and keep each detail in the class that owns it.
 
 ## Where Meta code lives
 
@@ -17,7 +17,7 @@ Meta changes field names, limits and error codes often. **Check every Meta detai
 | `MetaSignatureVerifier` | `infrastructure.meta` | HMAC-SHA256 of the raw body with the app secret, constant-time compare |
 | `MetaWebhookParser` | `infrastructure.meta` | The only class that knows Meta's JSON; turns it into domain-shaped records (`InboundEvent`, `StatusEvent`, `EchoEvent`, …) |
 | `WhatsappWebhookReader` (port) | `application.internal.outboundservices.whatsapp` | Signature check, verify token, and parsing into `WhatsappWebhookCommand`s |
-| `WhatsappGateway` (port) | `application.internal.outboundservices.whatsapp` | `sendText`, `sendButtons`, `sendList`, `sendTemplate` |
+| `WhatsappGateway`, `WhatsappMediaGateway` (ports) | `application.internal.outboundservices.whatsapp` | `sendText`, `sendButtons`, `sendList`, `sendTemplate`; `download` |
 | `WhatsappOnboarding` (port) | `application.internal.outboundservices.whatsapp` | Embedded Signup steps, creating the templates, unsubscribing |
 | `MetaGraphClient` | `infrastructure.meta` | Quarkus REST Client for the Graph API calls |
 | `MetaWhatsappGateway`, `MetaWhatsappOnboarding` | `infrastructure.meta` | Implement the ports with `MetaGraphClient`; active when `takodu.meta.enabled` (dev and test use fakes) |
@@ -40,7 +40,7 @@ Meta's JSON never leaves `infrastructure.meta`: the controller passes the raw bo
 | Account or partner removed | `WhatsappLine.disconnect()` | Line shown as disconnected |
 | Template status | `WhatsappLine.recordTemplateStatus` on the WABA's connected lines | Notifications wait until approved |
 
-A tapped button or list row is an inbound `interactive` (or template `button`) message with the title in `body`. Unknown kinds are stored as `unsupported`, never dropped.
+A tapped button or list row is an inbound `interactive` (or template `button`) message with the title in `body`. Unknown kinds are stored as `unsupported`, never dropped. Media keeps `media_id`; `MediaDownloader` later stores the file through `MediaStorage` at `<organization>/<message>` under `MEDIA_DIR`, within Meta's size limits, with `media_status` and at most 5 attempts.
 
 ## Sending
 
@@ -58,18 +58,18 @@ Limits checked when queued: text ≤ 4,096 characters, interactive body ≤ 1,02
 
 ## Connecting a line
 
-`POST /api/v1/establishments/{id}/whatsapp-line` with the Embedded Signup `code`, `wabaId`, `phoneNumberId` and `mode` (`coexistence` by default). Owner only (`Action.CONNECT_WHATSAPP`). The service exchanges the code, subscribes webhooks, reads the number, requests history sync (coexistence), creates the templates, and stores the line with the token encrypted. A `phone_number_id` already on another line is a conflict (W1). The owner waits for the result, so these Meta calls run in the request, before the transaction that stores the line ([takodu-jobs](../takodu-jobs/SKILL.md)).
+`POST /api/v1/establishments/{id}/whatsapp-line` with the Embedded Signup `code`, `wabaId`, `phoneNumberId` and `mode` (`coexistence` by default). Owner only (`Action.CONNECT_WHATSAPP`). The service exchanges the code, subscribes webhooks, reads the number, requests history sync (coexistence), creates the templates, and stores the line with the token encrypted. A `phone_number_id` already on another line is a conflict (W1). The owner waits, so these Meta calls run in the request, before the storing transaction ([takodu-jobs](../takodu-jobs/SKILL.md)).
 
 ## Security and privacy
 
 - The business token is stored only encrypted, decrypted only in the Meta adapters, and never returned by an endpoint.
 - **Never log message bodies, phone numbers or tokens.** Log `wamid`, line id and status.
-- Webhook payloads are untrusted input: validate before use, look the line up by `phone_number_id`, ignore what does not match.
+- Webhook payloads are untrusted: validate them and ignore what matches no line.
 - Media is served only through an authenticated endpoint that checks the caller can see the establishment.
 
 ## Tests
 
-- **Recorded payloads:** keep real Meta webhook JSON (anonymized) in `src/test/resources/meta/` (message, taps, echo, statuses, history) and replay each against `WebhookController` with a valid signature computed in the test. Assert rows, not logs.
+- **Recorded payloads:** keep anonymized Meta webhook JSON in `src/test/resources/meta/` and replay it against `WebhookController` with a signature computed in the test. Assert rows, not logs.
 - Replaying the same payload twice stores one message; a bad signature stores nothing and returns 401.
 - `Conversation.isWindowOpen`, `DeliveryStatus.advanceTo` and `ScheduledMessage.reminderFor` get plain JUnit tests at their boundaries (exactly 24 h, exactly 3 h).
 - Tests never call Meta: `RecordingWhatsappGateway` records sends and fails on demand.
