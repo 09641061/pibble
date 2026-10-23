@@ -1,6 +1,6 @@
 # Pibble architecture
 
-Pibble is a modular monolith: one Quarkus application and one PostgreSQL database, split into six bounded contexts whose boundaries `ArchitectureTest` verifies. The exact shape of each package and class is in the [takodu-ddd](../.agents/skills/takodu-ddd/SKILL.md) skill; why the contexts are cut this way is in the [bounded contexts decision](decisions/proposed/2026-10-19-six-bounded-contexts.md).
+Pibble is a modular monolith: one Quarkus application and one PostgreSQL database, split into six bounded contexts whose boundaries `ArchitectureTest` verifies. The exact shape of each package and class is in the [takodu-ddd](../.agents/skills/takodu-ddd/SKILL.md) skill; why the contexts are cut this way is in the [bounded contexts decision](decisions/implemented/2026-10-19-six-bounded-contexts.md).
 
 ## Contexts
 

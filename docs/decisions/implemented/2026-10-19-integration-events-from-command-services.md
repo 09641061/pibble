@@ -16,7 +16,7 @@ The publisher defines a `<Fact>IntegrationEvent` record in `<context>.interfaces
 
 **Direct calls to the other context's facade.** The publisher would depend on every listener, and `booking` calling `conversations` would create a cycle.
 
-**A message broker.** It adds infrastructure and asynchronous delivery that one process does not need ([decision](../proposed/2026-10-19-postgresql-as-the-only-infrastructure.md)).
+**A message broker.** It adds infrastructure and asynchronous delivery that one process does not need ([decision](2026-10-19-postgresql-as-the-only-infrastructure.md)).
 
 ## Consequences
 
