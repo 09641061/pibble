@@ -10,6 +10,7 @@ import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.hibernate.exception.ConstraintViolationException;
 
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -26,6 +27,12 @@ public class OrganizationRepositoryImpl implements OrganizationRepository {
     public Optional<Organization> findById(OrganizationId organizationId) {
         return organizationPersistenceRepository.findByIdOptional(organizationId.value())
                 .map(OrganizationPersistenceAssembler::toDomainFromPersistence);
+    }
+
+    @Override
+    public List<Organization> findAll() {
+        return organizationPersistenceRepository.listAll().stream()
+                .map(OrganizationPersistenceAssembler::toDomainFromPersistence).toList();
     }
 
     @Override
