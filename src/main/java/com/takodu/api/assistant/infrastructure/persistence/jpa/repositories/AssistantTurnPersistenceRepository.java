@@ -66,4 +66,35 @@ public class AssistantTurnPersistenceRepository implements PanacheRepositoryBase
         return count("organizationId = ?1 and conversationId = ?2 and status = ?3 and finishedAt >= ?4",
                 organizationId, conversationId, TurnStatus.DONE, since);
     }
+
+    /** A9: rows of day, turns, input, cached and output tokens, tool calls; the day is local to {@code zone}. */
+    public List<Object[]> dailyUsage(UUID organizationId, UUID establishmentId, String zone, Instant from, Instant to) {
+        @SuppressWarnings("unchecked") List<Object[]> rows = getEntityManager().createNativeQuery("""
+                        select cast(finished_at at time zone :zone as date), count(*),
+                               coalesce(sum(input_tokens), 0), coalesce(sum(cached_tokens), 0),
+                               coalesce(sum(output_tokens), 0), coalesce(sum(tool_calls), 0)
+                        from assistant_turns
+                        where organization_id = :organizationId and establishment_id = :establishmentId
+                          and status = 'done' and finished_at >= :from and finished_at < :to
+                        group by 1 order by 1""")
+                .setParameter("zone", zone)
+                .setParameter("organizationId", organizationId)
+                .setParameter("establishmentId", establishmentId)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList();
+        return rows;
+    }
+
+    public List<UUID> establishmentsWithUsage(UUID organizationId, Instant from, Instant to) {
+        return getEntityManager().createQuery("""
+                        select distinct t.establishmentId from AssistantTurnPersistenceEntity t
+                        where t.organizationId = :organizationId and t.status = :done
+                          and t.finishedAt >= :from and t.finishedAt < :to""", UUID.class)
+                .setParameter("organizationId", organizationId)
+                .setParameter("done", TurnStatus.DONE)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList();
+    }
 }

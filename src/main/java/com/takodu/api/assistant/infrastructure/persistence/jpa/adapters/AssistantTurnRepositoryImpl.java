@@ -4,15 +4,22 @@ import com.takodu.api.assistant.domain.exceptions.TurnAlreadyRunningException;
 import com.takodu.api.assistant.domain.model.aggregates.AssistantTurn;
 import com.takodu.api.assistant.domain.model.valueobjects.AssistantTurnId;
 import com.takodu.api.assistant.domain.model.valueobjects.ConversationId;
+import com.takodu.api.assistant.domain.model.valueobjects.DailyUsage;
 import com.takodu.api.assistant.domain.model.valueobjects.MessageId;
+import com.takodu.api.assistant.domain.model.valueobjects.UsageTotals;
 import com.takodu.api.assistant.domain.repositories.AssistantTurnRepository;
 import com.takodu.api.assistant.infrastructure.persistence.jpa.assemblers.AssistantTurnPersistenceAssembler;
 import com.takodu.api.assistant.infrastructure.persistence.jpa.repositories.AssistantTurnPersistenceRepository;
+import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.hibernate.exception.ConstraintViolationException;
 
+import java.sql.Date;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -58,6 +65,27 @@ public class AssistantTurnRepositoryImpl implements AssistantTurnRepository {
     public int countAnsweredSince(OrganizationId organizationId, ConversationId conversationId, Instant since) {
         return (int) assistantTurnPersistenceRepository.countAnsweredSince(organizationId.value(),
                 conversationId.value(), since);
+    }
+
+    @Override
+    public List<DailyUsage> dailyUsage(OrganizationId organizationId, EstablishmentId establishmentId, ZoneId zone,
+                                       Instant from, Instant to) {
+        return assistantTurnPersistenceRepository.dailyUsage(organizationId.value(), establishmentId.value(),
+                zone.getId(), from, to).stream()
+                .map(row -> new DailyUsage(localDate(row[0]), new UsageTotals(((Number) row[1]).intValue(),
+                        ((Number) row[2]).longValue(), ((Number) row[3]).longValue(), ((Number) row[4]).longValue(),
+                        ((Number) row[5]).intValue())))
+                .toList();
+    }
+
+    @Override
+    public List<EstablishmentId> establishmentsWithUsage(OrganizationId organizationId, Instant from, Instant to) {
+        return assistantTurnPersistenceRepository.establishmentsWithUsage(organizationId.value(), from, to).stream()
+                .map(EstablishmentId::new).toList();
+    }
+
+    private static LocalDate localDate(Object column) {
+        return column instanceof Date date ? date.toLocalDate() : (LocalDate) column;
     }
 
     /**
