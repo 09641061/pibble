@@ -49,14 +49,14 @@ public class ScheduledMessageDispatcher {
 }
 ```
 
-- **One row per transaction.** The `@Transactional` handler locks the next due row with `SELECT … WHERE status = 'pending' AND send_at <= :now ORDER BY send_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so two instances never take the same row. The port method is `@CrossTenant`: the job has no organization until it holds the row.
+- **One row per transaction.** The `@Transactional` handler locks the next due row with `SELECT … WHERE status = 'pending' AND send_at <= :now ORDER BY send_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so app instances share the work and never take the same row (`OutboundMessageSenderTest`); `SKIP` concurrency and wake-ups act per instance. The port method is `@CrossTenant`: no organization exists until the row is held.
 - **Re-check before acting.** The command handler reloads the row and re-checks the rule that allowed it: appointment still `confirmed`, plan active (O6), line connected (W15), window open for free-form text (W6), conversation not paused (A2). Otherwise it marks the row `cancelled` or `skipped`, or holds it.
 - **Call the port inside that transaction, with a short client timeout**, and record the outcome before commit: `sent` with the `wamid`, or `recordFailure()`. If the process dies after Meta accepted but before commit, the retry sends again; that rare duplicate is accepted. **Assistant turns are the exception:** their tools write in booking's own transactions, so the model runs between a claim and a record transaction, with `started_at` as a 5-minute lease ([takodu-assistant](../takodu-assistant/SKILL.md)). Webhooks never call an external system; a request calls one only when the user waits for the result (connecting a line, emailing a code), never inside a transaction.
-- **Retries are counted on the row**: outbound messages (W14) and media downloads stop at 5 attempts (`failed`, shown in the inbox); turns stop at 3 and hand the conversation off (A7). A failure is logged, ends the run and rolls the row back; no in-memory flag matters.
+- **Retries are counted on the row**: outbound messages (W14) and media downloads stop at 5 attempts (`failed`, shown in the inbox); turns stop at 3 and hand the conversation off (A7). A failure is logged, ends the run and rolls the row back.
 
 ## Wake-ups
 
-A request that creates work fires an integration event or a context-internal CDI event; an `@Observes(during = AFTER_SUCCESS)` handler calls the job's `wake()` method, which runs one claim cycle on a virtual thread. The wake-up is an optimization: if it is lost, the schedule picks the row up. **Never do the work in the after-commit handler.**
+A request that creates work fires an integration event or a context-internal CDI event; an `@Observes(during = AFTER_SUCCESS)` handler calls the job's `wake()` method, which runs one claim cycle on a virtual thread. A lost wake-up costs nothing: the schedule picks the row up. **Never do the work in the after-commit handler.**
 
 ## Idempotency
 
@@ -78,7 +78,7 @@ Inject `java.time.Clock` (UTC, from `shared.infrastructure.time.ClockProducer`),
 ## Tests
 
 - Domain: the row aggregate's transitions (`reminderFor`, `reschedule`, `recordFailure` reaching `FAILED`) with plain JUnit.
-- Job: a `@QuarkusTest` that inserts a due row, calls `dispatchDue()` directly (do not wait for the schedule), and asserts the row state and the fake port's calls. Disable schedules in tests with `quarkus.scheduler.enabled=false` in the `%test` profile.
+- Job: a `@QuarkusTest` that inserts a due row, calls `dispatchDue()` directly (do not wait for the schedule), and asserts the row state and the fake port's calls. Schedules are off in the `%test` profile.
 - Failure: make the fake port throw and assert `attempts` grows and stops at the limit.
 
 ## Checklist
