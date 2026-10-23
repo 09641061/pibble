@@ -37,7 +37,7 @@ The `prod` profile reads the database, Resend, JWT key and web app URL settings 
 java -jar target/quarkus-app/quarkus-run.jar
 ```
 
-Deployment is one JVM container (`src/main/docker/Dockerfile.jvm`) next to PostgreSQL on one VPS ([decision](docs/decisions/implemented/2026-10-19-quarkus-on-the-jvm.md)).
+Deployment is one JVM container (`src/main/docker/Dockerfile.jvm`) next to PostgreSQL on one VPS ([decision](docs/decisions/implemented/2026-10-19-quarkus-on-the-jvm.md)). The image runs as uid 185 with the media volume at `/deployments/media`; [docker-compose.yml](docker-compose.yml) runs it with PostgreSQL 18 from the `.env` file and the JWT keys in `keys/`.
 
 ## Local hooks
 
