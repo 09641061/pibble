@@ -15,14 +15,15 @@ Every row belongs to one organization, and a caller may act only inside the orga
 | `Role` | `shared.domain.model.valueobjects` | `owner`, `manager`, `staff`; the `Member` aggregate and `TenantContext` share it |
 | `Action`, `AccessPolicy` | `shared.application.tenancy` | Fixed permission table; `require(Action)` and `requireEstablishment(EstablishmentId)` throw `AccessDeniedException` |
 | `TenantFilter` | `organization.interfaces.rest.filters` | Reads the JWT subject and `X-Organization-Id`, loads the active membership, fills `TenantContext` or answers 403 |
+| `OperatorContext` | `shared.application.tenancy` | The Takodu team on `/internal/v1`: `userId()`, bound by `iam`'s `OperatorFilter` |
 | `TestTenants` | `src/test/java/com/takodu/api/shared/testing` | Creates user, organization and membership per role through the endpoints; returns a `TestTenant` with `spec()` |
 
-`TenantContext` sits in `shared` because every context reads it; only `organization` fills it, because `organization` owns memberships. `shared` never imports `organization`: the filter writes into the holder through its setter method `bind(...)`.
+`TenantContext` sits in `shared` because every context reads it; only `organization`, which owns memberships, fills it through `bind(...)`, so `shared` never imports `organization`.
 
 ## Request path
 
 1. SmallRye JWT verifies the access token; the subject is the `UserId`.
-2. `TenantFilter` skips `/webhooks/**`, `/api/v1/auth/**` and `/q/**`. For the rest, a missing or malformed `X-Organization-Id` gives 400, and no active membership gives 403 `ACCESS_DENIED`.
+2. `TenantFilter` skips `/webhooks/**`, `/api/v1/auth/**` and `/q/**`. `/internal/**` is outside `/api/v1`: `OperatorFilter` admits only enabled users with `users.platform_operator`, so a member's token gets 403 ([decision](../../../docs/decisions/implemented/2026-10-23-takodu-team-as-platform-operators.md)). For the rest, a missing or malformed `X-Organization-Id` gives 400, and no active membership gives 403 `ACCESS_DENIED`.
 3. The controller copies `tenantContext.organizationId()` (and `memberId()`/`userId()` when the command records an author) into the command. **It never reads them from the body or a path parameter.**
 4. The command service calls `accessPolicy.require(Action.X)` first, then `requireEstablishment(id)` when the target belongs to one establishment, then loads the aggregate scoped by the organization.
 
@@ -78,7 +79,7 @@ Services called from both a request and a job take the `OrganizationId` as a com
 
 ## Testing
 
-- Endpoint tests use `TestTenants.owner()`, `TestTenants.managerOf(tenant)` and `TestTenants.staffOf(tenant, establishmentId)`, never hand-built JWTs.
+- Endpoint tests use `TestTenants.owner()`, `TestTenants.managerOf(tenant)` and `TestTenants.staffOf(tenant, establishmentId)`, never hand-built JWTs; internal endpoints use `TestOperators.operator()`.
 - For every endpoint with a role restriction, test one forbidden role (403 `ACCESS_DENIED`) and one id from a second organization (404).
 - Domain tests need none of this: tenancy is application and interfaces only.
 

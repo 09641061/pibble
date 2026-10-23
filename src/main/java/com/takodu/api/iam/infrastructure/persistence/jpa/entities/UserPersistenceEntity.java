@@ -29,4 +29,7 @@ public class UserPersistenceEntity extends AuditableAbstractPersistenceEntity {
 
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
+
+    @Column(name = "platform_operator", nullable = false)
+    private boolean platformOperator;
 }
