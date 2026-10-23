@@ -1,7 +1,10 @@
 package com.takodu.api.conversations.domain.model.valueobjects;
 
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,6 +31,9 @@ public enum NotificationTemplate {
 
     /** Meta's code for Spanish. */
     public static final String LANGUAGE = "es";
+    private static final Locale SPANISH = Locale.forLanguageTag("es-PE");
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", SPANISH);
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", SPANISH);
     private static final Pattern PARAMETER = Pattern.compile("\\{\\{(\\d+)}}");
     private static final Pattern SPACES = Pattern.compile("\\s+");
 
@@ -87,6 +93,20 @@ public enum NotificationTemplate {
         var values = parameters(parameters);
         return PARAMETER.matcher(body).replaceAll(match -> Matcher.quoteReplacement(
                 values.get(Integer.parseInt(match.group(1)) - 1)));
+    }
+
+    /**
+     * @param start the appointment's start in the establishment's time zone, in which the customer reads it
+     * @return the parameters of a reminder or a confirmation, in Spanish: name, service, establishment, date, time
+     */
+    public static List<String> appointmentParameters(String customerName, String serviceName, String establishmentName,
+                                                     ZonedDateTime start) {
+        return List.of(customerName, serviceName, establishmentName, DATE.format(start), TIME.format(start));
+    }
+
+    /** @return the date and time of a cancellation, such as {@code sábado 24 de octubre a las 10:00} */
+    public static String dateAndTime(ZonedDateTime start) {
+        return DATE.format(start) + " a las " + TIME.format(start);
     }
 
     public static Optional<NotificationTemplate> fromMetaName(String metaName) {

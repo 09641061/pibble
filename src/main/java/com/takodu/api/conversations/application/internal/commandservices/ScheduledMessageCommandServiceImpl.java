@@ -160,7 +160,7 @@ public class ScheduledMessageCommandServiceImpl implements ScheduledMessageComma
             return;
         }
         var conversation = conversationRepository.lockOrStart(line.get(), notification.getCustomerId(), now);
-        var asTemplate = notification.getKind() == NotificationKind.REMINDER || !conversation.isWindowOpen(now);
+        var asTemplate = notification.getKind().goesAsTemplate(conversation.isWindowOpen(now));
         if (asTemplate && !line.get().canSend(template)) {
             notification.hold(TEMPLATE_NOT_APPROVED, now);
             return;

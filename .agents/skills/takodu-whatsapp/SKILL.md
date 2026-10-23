@@ -44,21 +44,21 @@ A tapped button or list row is an inbound `interactive` (or template `button`) m
 
 ## Sending
 
-Every outbound message follows the same path, whoever sends it:
+Every outbound message follows one path:
 
-1. The command service checks the plan (O6), the line is connected (W15) and, for anything but a template, `conversation.isWindowOpen(now)` (W6). A closed window is `WindowClosedException` (422) with a message that tells staff to use a template.
+1. The command service checks the plan (O6), the line is connected (W15) and, for anything but a template, `conversation.isWindowOpen(now)` (W6). A closed window is `WindowClosedException` (422), telling staff to use a template.
 2. It returns the existing message when the request's `Idempotency-Key` was already used, otherwise saves the `Message` as `pending` with that key in the caller's transaction (staff replies also call `recordHumanOutbound`, which pauses the assistant).
-3. `OutboundMessageSender` re-checks those rules, sends it through `WhatsappGateway` and records `sent` with the `wamid`. A failure waits 30 s, doubling each time, and the fifth one, or one Meta would repeat (`WhatsappSendException.retryable()` false), stores `failed` with Meta's error ([takodu-jobs](../takodu-jobs/SKILL.md)).
+3. `OutboundMessageSender` re-checks those rules, sends it through `WhatsappGateway` and records `sent` with the `wamid`. A failure waits 30 s, doubling each time; the fifth, or one Meta would repeat (`retryable()` false), stores `failed` with Meta's error ([takodu-jobs](../takodu-jobs/SKILL.md)).
 
 Limits checked when queued: text ≤ 4,096 characters, interactive body ≤ 1,024; `InteractiveChoices` allows ≤ 3 distinct button titles of ≤ 20, or ≤ 10 list rows of ≤ 24. The row stores the choices (`interactive_style`, `interactive_options`); ids are positions, and a tap is read by its title.
 
 ## Appointment notifications
 
-`NotificationTemplate` holds the three Spanish utility templates, each about one appointment, never promotional. Booking's events insert `ScheduledMessage` rows; `ScheduledMessageDispatcher` queues each due row as `Message.notification`: the template outside the window and for reminders, the same text inside it. Rows wait while plan, line or template forbids sending.
+`NotificationTemplate` holds the three Spanish utility templates, each about one appointment. Booking's events insert `ScheduledMessage` rows; `ScheduledMessageDispatcher` queues each due row as `Message.notification`: the template outside the window and for reminders, the same text inside it. Rows wait while plan, line or template forbids sending. Staff send an upcoming appointment's reminder or confirmation through `POST /conversations/{id}/templates`, refused instead of held; it pauses the assistant.
 
 ## Connecting a line
 
-`POST /api/v1/establishments/{id}/whatsapp-line` with the Embedded Signup `code`, `wabaId`, `phoneNumberId` and `mode` (`coexistence` by default). Owner only (`Action.CONNECT_WHATSAPP`). The service exchanges the code, subscribes webhooks, reads the number, requests history sync (coexistence), creates the templates, and stores the line with the token encrypted. A `phone_number_id` already on another line is a conflict (W1). The owner waits, so these Meta calls run in the request, before the storing transaction ([takodu-jobs](../takodu-jobs/SKILL.md)).
+`POST /api/v1/establishments/{id}/whatsapp-line` with the Embedded Signup `code`, `wabaId`, `phoneNumberId` and `mode` (default `coexistence`). Owner only (`Action.CONNECT_WHATSAPP`). The service exchanges the code, subscribes webhooks, requests history sync, creates the templates and stores the line, token encrypted. A `phone_number_id` already on another line is a conflict (W1). The owner waits, so these Meta calls run in the request, before the storing transaction ([takodu-jobs](../takodu-jobs/SKILL.md)).
 
 ## Security and privacy
 

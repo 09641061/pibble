@@ -125,6 +125,24 @@ class MessageTest {
         assertThrows(IllegalStateException.class, () -> reply("Hola").recordMediaStored("a"));
     }
 
+    @Test
+    void staffTemplateRecordsWhoSentItAndItsKey() {
+        var parameters = List.of("Ana", "Corte", "Sede Miraflores", "sábado 24 de octubre", "10:00");
+        var key = new IdempotencyKey(UUID.randomUUID());
+        var staff = new MemberId(UUID.randomUUID());
+
+        var message = Message.staffNotification(conversation(), staff, NotificationTemplate.REMINDER, parameters,
+                true, NOW, key);
+
+        assertEquals(MessageOrigin.STAFF, message.getOrigin());
+        assertEquals(MessageKind.TEMPLATE, message.getContent().kind());
+        assertEquals("takodu_reminder", message.getTemplateName());
+        assertEquals(staff, message.getSentBy());
+        assertEquals(key, message.getIdempotencyKey());
+        assertThrows(NullPointerException.class, () -> Message.staffNotification(conversation(), null,
+                NotificationTemplate.REMINDER, parameters, true, NOW, key));
+    }
+
     private static Message reply(String body) {
         return Message.staffText(conversation(), new MemberId(UUID.randomUUID()), body, NOW,
                 new IdempotencyKey(UUID.randomUUID()));

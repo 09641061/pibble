@@ -4,6 +4,7 @@ import com.takodu.api.conversations.domain.model.valueobjects.AppointmentId;
 import com.takodu.api.conversations.domain.model.valueobjects.MessageId;
 import com.takodu.api.conversations.domain.model.valueobjects.NotificationKind;
 import com.takodu.api.conversations.domain.model.valueobjects.NotificationStatus;
+import com.takodu.api.conversations.domain.model.valueobjects.NotificationTemplate;
 import com.takodu.api.conversations.domain.model.valueobjects.ScheduledMessageId;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
@@ -14,9 +15,7 @@ import lombok.Getter;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -37,10 +36,6 @@ public class ScheduledMessage {
     public static final Duration HELD_CUTOFF = Duration.ofHours(1);
     /** A held notification is checked again this often, so a reconnected line or a paid plan releases it. */
     public static final Duration HOLD_RECHECK = Duration.ofMinutes(10);
-
-    private static final Locale SPANISH = Locale.forLanguageTag("es-PE");
-    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", SPANISH);
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", SPANISH);
 
     private final ScheduledMessageId id;
     private final OrganizationId organizationId;
@@ -184,11 +179,9 @@ public class ScheduledMessage {
      */
     public List<String> parameters(String customerName, String serviceName, String establishmentName, ZoneId zone) {
         var local = startsAt.atZone(zone);
-        var date = DATE.format(local);
-        var time = TIME.format(local);
         return kind == NotificationKind.CANCELLATION
-                ? List.of(customerName, serviceName, date + " a las " + time, cancelReason)
-                : List.of(customerName, serviceName, establishmentName, date, time);
+                ? List.of(customerName, serviceName, NotificationTemplate.dateAndTime(local), cancelReason)
+                : NotificationTemplate.appointmentParameters(customerName, serviceName, establishmentName, local);
     }
 
     private static Optional<Instant> reminderTime(Instant startsAt, Instant now) {

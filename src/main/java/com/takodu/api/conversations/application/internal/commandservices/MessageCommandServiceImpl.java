@@ -1,12 +1,16 @@
 package com.takodu.api.conversations.application.internal.commandservices;
 
 import com.takodu.api.conversations.application.commandservices.MessageCommandService;
+import com.takodu.api.conversations.application.internal.outboundservices.acl.ExternalBookingService;
 import com.takodu.api.conversations.application.internal.outboundservices.acl.ExternalCustomersService;
 import com.takodu.api.conversations.application.internal.outboundservices.acl.ExternalOrganizationService;
 import com.takodu.api.conversations.application.internal.outboundservices.whatsapp.WhatsappGateway;
 import com.takodu.api.conversations.application.internal.outboundservices.whatsapp.WhatsappSendException;
+import com.takodu.api.conversations.domain.exceptions.AppointmentNotUpcomingException;
 import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundException;
+import com.takodu.api.conversations.domain.exceptions.CustomerDeletedException;
 import com.takodu.api.conversations.domain.exceptions.LineDisconnectedException;
+import com.takodu.api.conversations.domain.exceptions.TemplateNotApprovedException;
 import com.takodu.api.conversations.domain.exceptions.WindowClosedException;
 import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
@@ -14,6 +18,7 @@ import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.model.commands.SendAssistantReplyCommand;
 import com.takodu.api.conversations.domain.model.commands.SendNextPendingMessageCommand;
 import com.takodu.api.conversations.domain.model.commands.SendStaffMessageCommand;
+import com.takodu.api.conversations.domain.model.commands.SendStaffTemplateCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.events.OutboundMessageQueuedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.InteractiveChoices;
@@ -41,6 +46,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     private final WhatsappLineRepository whatsappLineRepository;
     private final ExternalOrganizationService externalOrganizationService;
     private final ExternalCustomersService externalCustomersService;
+    private final ExternalBookingService externalBookingService;
     private final WhatsappGateway whatsappGateway;
     private final AccessPolicy accessPolicy;
     private final Event<OutboundMessageQueuedEvent> outboundMessageQueued;
@@ -50,7 +56,8 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     public MessageCommandServiceImpl(MessageRepository messageRepository, ConversationRepository conversationRepository,
                                      WhatsappLineRepository whatsappLineRepository,
                                      ExternalOrganizationService externalOrganizationService,
-                                     ExternalCustomersService externalCustomersService, WhatsappGateway whatsappGateway,
+                                     ExternalCustomersService externalCustomersService,
+                                     ExternalBookingService externalBookingService, WhatsappGateway whatsappGateway,
                                      AccessPolicy accessPolicy, Event<OutboundMessageQueuedEvent> outboundMessageQueued,
                                      Event<ConversationChangedEvent> conversationChanged, Clock clock) {
         this.messageRepository = messageRepository;
@@ -58,6 +65,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
         this.whatsappLineRepository = whatsappLineRepository;
         this.externalOrganizationService = externalOrganizationService;
         this.externalCustomersService = externalCustomersService;
+        this.externalBookingService = externalBookingService;
         this.whatsappGateway = whatsappGateway;
         this.accessPolicy = accessPolicy;
         this.outboundMessageQueued = outboundMessageQueued;
@@ -83,6 +91,46 @@ public class MessageCommandServiceImpl implements MessageCommandService {
 
         var message = messageRepository.save(Message.staffText(conversation, command.sentBy(), command.body(), now,
                 command.idempotencyKey()));
+        conversation.recordHumanOutbound(now);
+        conversationRepository.save(conversation);
+        outboundMessageQueued.fire(new OutboundMessageQueuedEvent(message.getId()));
+        conversationChanged.fire(changed(conversation));
+        return message;
+    }
+
+    @Override
+    @Transactional
+    public Message handle(SendStaffTemplateCommand command) {
+        accessPolicy.require(Action.REPLY_IN_INBOX);
+        var earlier = messageRepository.findByIdempotencyKey(command.organizationId(), command.idempotencyKey());
+        if (earlier.isPresent()) return earlier.get();
+        var conversation = conversationRepository.lockById(command.organizationId(), command.conversationId())
+                .orElseThrow(() -> new ConversationNotFoundException(command.conversationId()));
+        accessPolicy.requireEstablishment(conversation.getEstablishmentId());
+        var organizationId = command.organizationId();
+        var establishment = externalOrganizationService.fetchEstablishment(organizationId,
+                conversation.getEstablishmentId());
+        if (!establishment.planActive()) throw new PlanInactiveException(organizationId.value());
+        var line = whatsappLineRepository.findById(organizationId, conversation.getLineId())
+                .filter(WhatsappLine::isConnected)
+                .orElseThrow(LineDisconnectedException::new);
+        var appointment = externalBookingService.fetchUpcomingAppointment(organizationId,
+                        conversation.getEstablishmentId(), conversation.getCustomerId(), command.appointmentId())
+                .orElseThrow(() -> new AppointmentNotUpcomingException(command.appointmentId()));
+        var now = clock.instant();
+        var template = command.kind().template();
+        var asTemplate = command.kind().goesAsTemplate(conversation.isWindowOpen(now));
+        if (asTemplate && !line.canSend(template)) throw new TemplateNotApprovedException(template.metaName());
+        var customer = externalCustomersService.fetchContact(organizationId, conversation.getCustomerId())
+                .filter(contact -> !contact.deleted())
+                .orElseThrow(CustomerDeletedException::new);
+        var serviceName = externalOrganizationService.fetchServiceName(organizationId, appointment.serviceId())
+                .orElseThrow(() -> new AppointmentNotUpcomingException(command.appointmentId()));
+
+        var parameters = NotificationTemplate.appointmentParameters(customer.displayName(), serviceName,
+                establishment.name(), appointment.startsAt().atZone(establishment.timeZone()));
+        var message = messageRepository.save(Message.staffNotification(conversation, command.sentBy(), template,
+                parameters, asTemplate, now, command.idempotencyKey()));
         conversation.recordHumanOutbound(now);
         conversationRepository.save(conversation);
         outboundMessageQueued.fire(new OutboundMessageQueuedEvent(message.getId()));

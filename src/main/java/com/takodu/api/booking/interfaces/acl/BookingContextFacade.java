@@ -29,7 +29,12 @@ public interface BookingContextFacade {
     AppointmentView book(UUID organizationId, UUID customerId, UUID serviceId, UUID staffMemberId, Instant start,
                          UUID idempotencyKey);
 
-    /** @return the customer's confirmed appointments at the establishment that have not started, earliest first */
+    /**
+     * Also called in a staff request, when the inbox sends an appointment's template; the caller must see the
+     * establishment.
+     *
+     * @return the customer's confirmed appointments at the establishment that have not started, earliest first
+     */
     List<AppointmentView> fetchUpcomingAppointments(UUID organizationId, UUID establishmentId, UUID customerId);
 
     /**

@@ -127,12 +127,32 @@ public class Message {
      */
     public static Message notification(Conversation conversation, NotificationTemplate template,
                                        List<String> parameters, boolean asTemplate, Instant now) {
+        return notification(conversation, MessageOrigin.SYSTEM, null, template, parameters, asTemplate, now, null);
+    }
+
+    /**
+     * W6, 07 §7: staff send an appointment's reminder or confirmation, which reaches a customer whose window is
+     * closed. It goes and shows like the dispatcher's, but records who sent it.
+     *
+     * @param asTemplate whether it must go as the template, as for {@link #notification}
+     */
+    public static Message staffNotification(Conversation conversation, MemberId sentBy, NotificationTemplate template,
+                                            List<String> parameters, boolean asTemplate, Instant now,
+                                            IdempotencyKey idempotencyKey) {
+        return notification(conversation, MessageOrigin.STAFF,
+                Objects.requireNonNull(sentBy, "Staff messages record who sent them"), template, parameters,
+                asTemplate, now, Objects.requireNonNull(idempotencyKey, "idempotencyKey is required"));
+    }
+
+    private static Message notification(Conversation conversation, MessageOrigin origin, MemberId sentBy,
+                                        NotificationTemplate template, List<String> parameters, boolean asTemplate,
+                                        Instant now, IdempotencyKey idempotencyKey) {
         var body = template.render(parameters);
         return new Message(null, conversation.getOrganizationId(), conversation.getId(), MessageDirection.OUT,
-                MessageOrigin.SYSTEM, null, new MessageContent(asTemplate ? MessageKind.TEMPLATE : MessageKind.TEXT,
+                origin, null, new MessageContent(asTemplate ? MessageKind.TEMPLATE : MessageKind.TEXT,
                 body, null, null), asTemplate ? template.metaName() : null,
                 asTemplate ? template.parameters(parameters) : List.of(), null, DeliveryStatus.PENDING, null, null, null,
-                null, 0, now, null, now, null);
+                sentBy, 0, now, idempotencyKey, now, null);
     }
 
     /** W5: the owner replied from the WhatsApp Business app; WhatsApp already sent it. */
