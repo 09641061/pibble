@@ -10,6 +10,9 @@ import java.util.UUID;
  */
 public interface OrganizationContextFacade {
 
+    /** @return the organization's name, empty when no organization has this id */
+    Optional<String> fetchOrganizationName(UUID organizationId);
+
     /** @return the establishment's time zone, opening hours and plan state, empty when not in the organization */
     Optional<EstablishmentCalendarView> fetchCalendar(UUID organizationId, UUID establishmentId);
 

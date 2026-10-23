@@ -1,5 +1,6 @@
 package com.takodu.api.organization.application.acl;
 
+import com.takodu.api.organization.domain.model.aggregates.Organization;
 import com.takodu.api.organization.application.queryservices.BookableService;
 import com.takodu.api.organization.application.queryservices.EstablishmentQueryService;
 import com.takodu.api.organization.application.queryservices.MemberQueryService;
@@ -45,6 +46,12 @@ public class OrganizationContextFacadeImpl implements OrganizationContextFacade 
         this.serviceQueryService = serviceQueryService;
         this.memberQueryService = memberQueryService;
         this.clock = clock;
+    }
+
+    @Override
+    public Optional<String> fetchOrganizationName(UUID organizationId) {
+        return organizationQueryService.handle(new GetOrganizationByIdQuery(new OrganizationId(organizationId)))
+                .map(Organization::getName);
     }
 
     @Override

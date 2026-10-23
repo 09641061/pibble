@@ -16,7 +16,7 @@ public final class MessageResourceFromEntityAssembler {
         return new MessageResource(message.getId().value(), message.getConversationId().value(),
                 lower(message.getDirection()), lower(message.getOrigin()), lower(content.kind()), content.body(),
                 content.mediaId() != null, content.mediaMime(),
-                message.mediaStatus() == null ? null : lower(message.mediaStatus()), message.getTemplateName(), lower(message.getStatus()),
+                mediaStatus(message), message.getTemplateName(), lower(message.getStatus()),
                 message.getError(), message.getSentBy() == null ? null : message.getSentBy().value(),
                 choices == null ? null : lower(choices.style()), choices == null ? List.of() : choices.titles(),
                 message.getOccurredAt());
@@ -32,5 +32,12 @@ public final class MessageResourceFromEntityAssembler {
 
     private static String lower(Enum<?> value) {
         return value.name().toLowerCase(Locale.ROOT);
+    }
+
+    /** A file being deleted is already gone for the inbox. */
+    private static String mediaStatus(Message message) {
+        var status = message.mediaStatus();
+        if (status == null) return null;
+        return status.isRemoved() ? "removed" : lower(status);
     }
 }

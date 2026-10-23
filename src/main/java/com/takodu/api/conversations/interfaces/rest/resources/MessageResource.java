@@ -11,7 +11,8 @@ import java.util.UUID;
  * @param origin {@code customer}, {@code assistant}, {@code staff}, {@code business_app}, {@code system} or {@code history}
  * @param status {@code received}, {@code pending}, {@code sent}, {@code delivered}, {@code read} or {@code failed}
  * @param mediaStatus for media, {@code pending} while it downloads, {@code ready} to fetch from
- *        {@code /api/v1/media/{id}}, or {@code failed}; null without media
+ *        {@code /api/v1/media/{id}}, {@code failed}, or {@code removed} once the file was deleted (C5, retention);
+ *        null without media
  * @param error why sending failed, such as Meta's {@code 131047: Re-engagement message}
  * @param sentByMemberId the member who wrote a staff reply
  * @param choicesStyle {@code buttons} or {@code list} for an assistant reply that offered choices; null otherwise
