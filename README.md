@@ -30,7 +30,7 @@ scripts/check-docs.sh              # documentation
 
 ## Production
 
-The `prod` profile reads the database, Resend, JWT key and web app URL settings from environment variables; [.env.example](.env.example) lists them. Quarkus loads a `.env` file at the root if it exists; never commit it.
+The `prod` profile reads the database, Resend, JWT key and web app URL settings from environment variables; [.env.example](.env.example) lists them. Quarkus loads a `.env` file at the root if it exists; never commit it. The application refuses to start when one of them is missing (`ProductionConfigTest` lists them). Production logs JSON, serves neither Swagger UI nor the OpenAPI document, and accepts browser calls only from `APP_URL`.
 
 ```sh
 ./mvnw package
