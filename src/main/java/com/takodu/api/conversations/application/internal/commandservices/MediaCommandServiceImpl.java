@@ -8,6 +8,8 @@ import com.takodu.api.conversations.domain.exceptions.LineDisconnectedException;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.model.commands.DownloadNextMediaCommand;
+import com.takodu.api.conversations.domain.model.commands.RemoveCustomerMediaCommand;
+import com.takodu.api.conversations.domain.model.commands.RemoveNextMediaCommand;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.MediaDownload;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
@@ -64,6 +66,35 @@ public class MediaCommandServiceImpl implements MediaCommandService {
         messageRepository.save(message);
         conversationChanged.fire(new ConversationChangedEvent(conversation.getOrganizationId(),
                 conversation.getEstablishmentId(), conversation.getId()));
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public void handle(RemoveCustomerMediaCommand command) {
+        for (var message : messageRepository.findMediaToRemove(command.organizationId(), command.customerId())) {
+            message.requestMediaRemoval();
+            messageRepository.save(message);
+        }
+    }
+
+    /**
+     * Deletes the file before the row says so: if the commit fails, the next run finds the row again and deleting a
+     * missing file succeeds.
+     */
+    @Override
+    @Transactional
+    public boolean handle(RemoveNextMediaCommand command) {
+        var claimed = messageRepository.claimNextMediaRemoval(command.expiredBefore());
+        if (claimed.isEmpty()) return false;
+        var message = claimed.get();
+        var path = message.getMedia().path();
+        if (path != null) mediaStorage.delete(path);
+        message.recordMediaRemoved();
+        messageRepository.save(message);
+        conversationRepository.findById(message.getOrganizationId(), message.getConversationId())
+                .ifPresent(conversation -> conversationChanged.fire(new ConversationChangedEvent(
+                        conversation.getOrganizationId(), conversation.getEstablishmentId(), conversation.getId())));
         return true;
     }
 

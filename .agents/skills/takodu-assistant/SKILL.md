@@ -65,7 +65,7 @@ The model returns `AgentReply(text, options)` as JSON. `AssistantReply.format()`
 
 ## Guardrails
 
-At most 8 tool calls per turn (`TurnScope`) and 30 answered turns per conversation per day, after which the conversation is handed off; `maxSequentialToolsInvocations(10)` is the hard stop. The model is configured only through `quarkus.langchain4j.openai.*` properties (any OpenAI-compatible provider), so changing it needs no code; compare candidates on recorded conversations by booking accuracy and cost per turn from `assistant_turns`.
+At most 8 tool calls per turn (`TurnScope`) and 30 answered turns per conversation per day, after which the conversation is handed off; `maxSequentialToolsInvocations(10)` is the hard stop. The model is configured only through `quarkus.langchain4j.openai.*` properties (any OpenAI-compatible provider), so changing it needs no code; compare candidates on recorded conversations by booking accuracy and cost per turn from `GET …/assistant/usage`.
 
 ## Tests
 

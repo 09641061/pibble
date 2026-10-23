@@ -1,11 +1,11 @@
 ---
 name: takodu-jobs
-description: How background work runs in the pibble backend — work stored as rows (scheduled_messages, assistant_turns, pending media), @Scheduled jobs that claim rows with SELECT FOR UPDATE SKIP LOCKED, after-commit wake-ups, retries with attempt limits, idempotency keys, the injected Clock, and how to test jobs. Use when adding or changing ScheduledMessageDispatcher, TurnWorker, MediaDownloader, CleanupJob or any other scheduled or deferred work, when a call to Meta, the LLM or Resend must happen after a user action, or when work is lost, duplicated or stuck.
+description: How background work runs in the pibble backend — work stored as rows (scheduled_messages, assistant_turns, pending media), @Scheduled jobs that claim rows with SELECT FOR UPDATE SKIP LOCKED, after-commit wake-ups, retries with attempt limits, idempotency keys, the injected Clock, and how to test jobs. Use when adding or changing any scheduled job (ScheduledMessageDispatcher, TurnWorker, MediaDownloader, MediaRetentionJob, CleanupJob) or other deferred work, when a call to Meta, the LLM or Resend must happen after a user action, or when work is lost, duplicated or stuck.
 ---
 
 # Background jobs in pibble
 
-Slow or failing work never runs inside a request or webhook transaction. The transaction inserts a row; a job claims the row and does the work. The decision is [webhooks store first; outgoing work is polled from tables](../../../docs/decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md). Package names are relative to `com.takodu.api`.
+Slow or failing work never runs inside a request or webhook transaction: the transaction inserts a row, and a job claims it. The decision is [webhooks store first; outgoing work is polled from tables](../../../docs/decisions/implemented/2026-10-19-webhooks-store-first-and-polled-outbox.md). Package names are relative to `com.takodu.api`.
 
 ## The jobs
 
@@ -14,6 +14,7 @@ Slow or failing work never runs inside a request or webhook transaction. The tra
 | `ScheduledMessageDispatcher` | `conversations` | `scheduled_messages` (`pending`, `send_at <= now`) | every 30 s | Queue confirmations, reminders and cancellations as outbox messages (W11–W15) |
 | `OutboundMessageSender` | `conversations` | `messages` (`pending`, outbound) | after-commit wake-up + every 10 s | Send staff and assistant messages to Meta |
 | `MediaDownloader` | `conversations` | `messages` with `media_id` and no `media_path` | after-commit wake-up + every 60 s | Download inbound media to the media volume |
+| `MediaRetentionJob` | `conversations` | media `removing` (C5) or past `takodu.media.retention-days` | every 10 min | Delete the file, mark it `removed` |
 | `TurnWorker` | `assistant` | `assistant_turns` (`pending`, or `running` past its lease) | after-commit wake-up + every 10 s | Run the assistant, at most 4 turns in parallel |
 | `CleanupJob` | `iam` | expired `login_codes`, `sessions` | daily | Delete them |
 
@@ -49,13 +50,13 @@ public class ScheduledMessageDispatcher {
 ```
 
 - **One row per transaction.** The `@Transactional` handler locks the next due row with `SELECT … WHERE status = 'pending' AND send_at <= :now ORDER BY send_at LIMIT 1 FOR UPDATE SKIP LOCKED`, so two instances never take the same row. The port method is `@CrossTenant`: the job has no organization until it holds the row.
-- **Re-check before acting.** The command handler reloads the row and re-checks the rule that allowed it: appointment still `confirmed`, plan active (O6), line connected (W15), window open for free-form text (W6), conversation not paused (A2). If the rule no longer holds, it marks the row `cancelled` or `skipped`, or holds it for a later run.
-- **Call the port inside that transaction, with a short client timeout**, and record the outcome before commit: `sent` with the `wamid`, or `recordFailure()`. If the process dies after Meta accepted but before commit, the retry sends again; that rare duplicate is accepted. **Assistant turns are the exception:** their tools write in booking's own transactions, so the model runs between a claim and a record transaction, with `started_at` as a 5-minute lease ([takodu-assistant](../takodu-assistant/SKILL.md)). Webhooks never call an external system. A request calls one only when the user waits for that result (connecting a line, emailing a code or an invitation), never inside a transaction.
-- **Retries are counted on the row**: outbound messages (W14) and media downloads stop at 5 attempts (`failed`, shown in the inbox); turns stop at 3 and hand the conversation off (A7). A failure is logged, ends the run and rolls the row back to `pending`; no in-memory flag matters.
+- **Re-check before acting.** The command handler reloads the row and re-checks the rule that allowed it: appointment still `confirmed`, plan active (O6), line connected (W15), window open for free-form text (W6), conversation not paused (A2). Otherwise it marks the row `cancelled` or `skipped`, or holds it.
+- **Call the port inside that transaction, with a short client timeout**, and record the outcome before commit: `sent` with the `wamid`, or `recordFailure()`. If the process dies after Meta accepted but before commit, the retry sends again; that rare duplicate is accepted. **Assistant turns are the exception:** their tools write in booking's own transactions, so the model runs between a claim and a record transaction, with `started_at` as a 5-minute lease ([takodu-assistant](../takodu-assistant/SKILL.md)). Webhooks never call an external system; a request calls one only when the user waits for the result (connecting a line, emailing a code), never inside a transaction.
+- **Retries are counted on the row**: outbound messages (W14) and media downloads stop at 5 attempts (`failed`, shown in the inbox); turns stop at 3 and hand the conversation off (A7). A failure is logged, ends the run and rolls the row back; no in-memory flag matters.
 
 ## Wake-ups
 
-A request that creates work fires an integration event or a context-internal CDI event; an `@Observes(during = AFTER_SUCCESS)` handler calls the job's `wake()` method, which runs one claim cycle on a virtual thread. The wake-up is an optimization: if it is lost, the schedule picks the row up. **Never put the work itself in the after-commit handler.**
+A request that creates work fires an integration event or a context-internal CDI event; an `@Observes(during = AFTER_SUCCESS)` handler calls the job's `wake()` method, which runs one claim cycle on a virtual thread. The wake-up is an optimization: if it is lost, the schedule picks the row up. **Never do the work in the after-commit handler.**
 
 ## Idempotency
 

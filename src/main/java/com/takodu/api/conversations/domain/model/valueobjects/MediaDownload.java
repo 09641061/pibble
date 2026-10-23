@@ -8,7 +8,8 @@ import java.util.Objects;
  * Where the download of a message's image, audio, video, document or sticker stands. Meta keeps only an id; the media
  * job fetches the file and stores it on Takodu's disk.
  *
- * @param path where the file is stored, relative to the media directory; set only when {@code READY}
+ * @param path where the file is stored, relative to the media directory; set when {@code READY}, and kept while
+ *        {@code REMOVING} until the file is deleted
  * @param attempts the downloads tried so far
  * @param nextAttemptAt when the job may try again; set only while {@code PENDING}
  * @param error why the last attempt failed, without the url or the content
@@ -23,7 +24,8 @@ public record MediaDownload(MediaStatus status, String path, int attempts, Insta
 
     public MediaDownload {
         Objects.requireNonNull(status, "status is required");
-        if ((status == MediaStatus.READY) != (path != null))
+        if (status == MediaStatus.READY && path == null) throw new IllegalArgumentException("Downloaded media has a path");
+        if (path != null && status != MediaStatus.READY && status != MediaStatus.REMOVING)
             throw new IllegalArgumentException("Only downloaded media has a path");
     }
 
@@ -65,5 +67,16 @@ public record MediaDownload(MediaStatus status, String path, int attempts, Insta
         if (!retryable || tried >= MAX_ATTEMPTS) return new MediaDownload(MediaStatus.FAILED, null, tried, null, why);
         return new MediaDownload(MediaStatus.PENDING, null, tried, now.plus(FIRST_RETRY.multipliedBy(1L << (tried - 1))),
                 why);
+    }
+
+    /** C5: the customer was deleted, so the file goes too; the retention job deletes it. */
+    public MediaDownload removalRequested() {
+        if (status.isRemoved()) return this;
+        return new MediaDownload(MediaStatus.REMOVING, path, attempts, null, null);
+    }
+
+    /** The file was deleted, or never downloaded; the message keeps its kind and caption. */
+    public MediaDownload removed() {
+        return new MediaDownload(MediaStatus.REMOVED, null, attempts, null, null);
     }
 }

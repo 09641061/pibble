@@ -6,6 +6,7 @@ import com.takodu.api.conversations.application.queryservices.MessageQueryServic
 import com.takodu.api.conversations.domain.exceptions.ConversationNotFoundException;
 import com.takodu.api.conversations.domain.exceptions.MediaDownloadFailedException;
 import com.takodu.api.conversations.domain.exceptions.MediaNotReadyException;
+import com.takodu.api.conversations.domain.exceptions.MediaRemovedException;
 import com.takodu.api.conversations.domain.exceptions.MessageNotFoundException;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.queries.GetMessageMediaQuery;
@@ -58,6 +59,7 @@ public class MessageQueryServiceImpl implements MessageQueryService {
             case PENDING -> throw new MediaNotReadyException();
             case FAILED -> throw new MediaDownloadFailedException(media.error());
             case READY -> new MessageMedia(message.getContent().mediaMime(), mediaStorage.open(media.path()));
+            case REMOVING, REMOVED -> throw new MediaRemovedException();
         };
     }
 
