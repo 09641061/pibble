@@ -108,6 +108,25 @@ class MembersControllerTest {
     }
 
     @Test
+    void anyMemberRenamesOnlyThemselves() {
+        var owner = TestTenants.owner();
+        var staff = TestTenants.staffOf(owner);
+        String ownerName = given().spec(owner.spec()).get("/api/v1/members").then().statusCode(200)
+                .extract().path("find { it.id == '%s' }.displayName".formatted(owner.memberId()));
+
+        given().spec(staff.spec()).contentType(ContentType.JSON).body(Map.of("displayName", "  Carla Ríos "))
+                .put("/api/v1/members/me").then().statusCode(200)
+                .body("id", equalTo(staff.memberId().toString()))
+                .body("displayName", equalTo("Carla Ríos"));
+
+        given().spec(owner.spec()).get("/api/v1/members").then().statusCode(200)
+                .body("find { it.id == '%s' }.displayName".formatted(staff.memberId()), equalTo("Carla Ríos"))
+                .body("find { it.id == '%s' }.displayName".formatted(owner.memberId()), equalTo(ownerName));
+        given().spec(staff.spec()).contentType(ContentType.JSON).body(Map.of("displayName", " "))
+                .put("/api/v1/members/me").then().statusCode(400);
+    }
+
+    @Test
     void managerInvitesStaff() {
         var owner = TestTenants.owner();
         var manager = TestTenants.managerOf(owner);
