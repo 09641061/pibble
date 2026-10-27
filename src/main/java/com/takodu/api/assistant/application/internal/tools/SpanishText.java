@@ -1,11 +1,13 @@
 package com.takodu.api.assistant.application.internal.tools;
 
+import com.takodu.api.assistant.domain.model.valueobjects.PartOfDay;
 import com.takodu.api.shared.domain.model.valueobjects.Money;
 
 import java.text.Normalizer;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
@@ -32,6 +34,19 @@ final class SpanishText {
 
     static String time(Instant instant, ZoneId zone) {
         return TIME.format(instant.atZone(zone));
+    }
+
+    static String time(LocalTime time) {
+        return TIME.format(time);
+    }
+
+    /** @return such as {@code en la tarde} */
+    static String partOfDay(PartOfDay part) {
+        return switch (part) {
+            case MORNING -> "en la mañana";
+            case AFTERNOON -> "en la tarde";
+            case EVENING -> "en la noche";
+        };
     }
 
     static String weekday(DayOfWeek day) {
