@@ -16,6 +16,7 @@ import com.takodu.api.organization.domain.model.commands.InviteMemberCommand;
 import com.takodu.api.organization.domain.model.commands.RemoveMemberCommand;
 import com.takodu.api.organization.domain.model.commands.RenewInvitationCommand;
 import com.takodu.api.organization.domain.model.commands.TransferOwnershipCommand;
+import com.takodu.api.organization.domain.model.commands.RenameOwnMembershipCommand;
 import com.takodu.api.organization.domain.model.commands.UpdateMemberCommand;
 import com.takodu.api.organization.domain.repositories.EstablishmentRepository;
 import com.takodu.api.organization.domain.repositories.MemberRepository;
@@ -155,6 +156,14 @@ public class MemberCommandServiceImpl implements MemberCommandService {
     private void dropFromServicesTheyCannotPerform(Member member) {
         for (var service : serviceRepository.findByPerformer(member.getOrganizationId(), member.getId()))
             if (service.dropIfIneligible(member)) serviceRepository.save(service);
+    }
+
+    @Override
+    @Transactional
+    public Member handle(RenameOwnMembershipCommand command) {
+        var member = load(command.organizationId(), command.memberId());
+        member.rename(command.displayName());
+        return memberRepository.save(member);
     }
 
     private Member load(OrganizationId organizationId, MemberId memberId) {

@@ -45,7 +45,7 @@ Dependencies go `interfaces → application → domain ← infrastructure`. The 
 | `InboundMessageReceived` | `assistant` | in transaction | Enqueues an assistant turn when the assistant may answer |
 | `InboundMessageReceived` | `assistant` | after commit | Wakes the turn worker |
 
-In-transaction listeners write only their own tables, so a failure rolls back everything. After-commit listeners only wake work up; a polling job recovers anything lost. `ConversationChanged`, feeding the SSE inbox stream, is a CDI event inside `conversations`. Event names above omit the `IntegrationEvent` suffix. The detail and templates are in [takodu-context-integration](../.agents/skills/takodu-context-integration/SKILL.md).
+In-transaction listeners write only their own tables, so a failure rolls back everything. After-commit listeners only wake work up; a polling job recovers anything lost. `ConversationChanged` and `AssistantActivity` feed the SSE inbox stream as CDI events inside `conversations`. Event names above omit the `IntegrationEvent` suffix. The detail and templates are in [takodu-context-integration](../.agents/skills/takodu-context-integration/SKILL.md).
 
 ## Requests, tenancy and background work
 

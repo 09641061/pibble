@@ -15,7 +15,7 @@ public final class AppointmentResourceFromEntityAssembler {
                 appointment.getPrice().cents(), appointment.getPrice().currency(), lower(appointment.getStatus()),
                 lower(appointment.getSource()),
                 appointment.getCancelReason() == null ? null : appointment.getCancelReason().value(),
-                lower(appointment.getCancelledBy()));
+                lower(appointment.getCancelledBy()), appointment.getCreatedAt());
     }
 
     private static String lower(Enum<?> value) {

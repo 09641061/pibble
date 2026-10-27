@@ -9,6 +9,8 @@ import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.queries.GetConversationByIdQuery;
 import com.takodu.api.conversations.domain.model.queries.GetConversationForAssistantQuery;
 import com.takodu.api.conversations.domain.model.queries.GetConversationsByEstablishmentQuery;
+import com.takodu.api.conversations.domain.model.queries.GetInboxSummaryQuery;
+import com.takodu.api.conversations.domain.model.valueobjects.InboxSummary;
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.conversations.domain.repositories.WhatsappLineRepository;
@@ -51,6 +53,14 @@ public class ConversationQueryServiceImpl implements ConversationQueryService {
         var conversations = conversationRepository.findByEstablishment(query.organizationId(), query.establishmentId(),
                 query.after(), query.size());
         return inbox(query.organizationId(), conversations);
+    }
+
+    @Override
+    public InboxSummary handle(GetInboxSummaryQuery query) {
+        accessPolicy.require(Action.REPLY_IN_INBOX);
+        externalOrganizationService.fetchEstablishment(query.organizationId(), query.establishmentId());
+        accessPolicy.requireEstablishment(query.establishmentId());
+        return conversationRepository.summarize(query.organizationId(), query.establishmentId());
     }
 
     @Override

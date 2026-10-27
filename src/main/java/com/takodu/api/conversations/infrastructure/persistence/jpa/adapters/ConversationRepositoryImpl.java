@@ -6,6 +6,7 @@ import com.takodu.api.conversations.domain.repositories.ConversationRepository;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.assemblers.ConversationPersistenceAssembler;
 import com.takodu.api.conversations.infrastructure.persistence.jpa.repositories.ConversationPersistenceRepository;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.model.valueobjects.InboxSummary;
 import com.takodu.api.conversations.domain.model.valueobjects.PageCursor;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
@@ -51,6 +52,12 @@ public class ConversationRepositoryImpl implements ConversationRepository {
                         after == null ? null : after.at(), after == null ? null : after.id(), limit).stream()
                 .map(ConversationPersistenceAssembler::toDomainFromPersistence)
                 .toList();
+    }
+
+    @Override
+    public InboxSummary summarize(OrganizationId organizationId, EstablishmentId establishmentId) {
+        var counts = conversationPersistenceRepository.summarize(organizationId.value(), establishmentId.value());
+        return new InboxSummary(Math.toIntExact(counts[0]), Math.toIntExact(counts[1]));
     }
 
     @Override

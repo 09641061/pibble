@@ -114,6 +114,20 @@ class TurnWorkerTest {
     }
 
     @Test
+    void askingForTomorrowAfternoonShowsAfternoonTimes() {
+        customerSays("¿Tienen cita mañana en la tarde para corte?");
+        model.script(
+                tool("findSlots", "{\"serviceName\": \"corte\", \"date\": \"%s\", \"timeOfDay\": \"tarde\"}"
+                        .formatted(day(1))),
+                reply("Tengo a las 12:00, 13:00 o 14:00.", "12:00", "13:00", "14:00"));
+
+        run();
+
+        var result = toolResults(model.requests().getLast()).getFirst();
+        assertTrue(result.contains(" en la tarde: 12:00, 13:00, 14:00, 15:00, 16:00, 17:00 y 15 más."), result);
+    }
+
+    @Test
     void shortChoicesGoAsButtonsAndATapIsTheNextMessageTheModelReads() {
         customerSays("¿Tienen cita mañana para corte?");
         clock.advance(Duration.ofSeconds(5));

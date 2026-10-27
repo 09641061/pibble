@@ -178,8 +178,7 @@ public class MessageCommandServiceImpl implements MessageCommandService {
     }
 
     private static ConversationChangedEvent changed(Conversation conversation) {
-        return new ConversationChangedEvent(conversation.getOrganizationId(), conversation.getEstablishmentId(),
-                conversation.getId());
+        return ConversationChangedEvent.of(conversation);
     }
 
     /** Re-checks O6, W15 and W6 before calling Meta: they may have changed since the message was queued. */

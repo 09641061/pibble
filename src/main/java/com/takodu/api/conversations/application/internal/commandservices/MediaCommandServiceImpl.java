@@ -64,8 +64,7 @@ public class MediaCommandServiceImpl implements MediaCommandService {
             download(message, line.get(), command.now());
         }
         messageRepository.save(message);
-        conversationChanged.fire(new ConversationChangedEvent(conversation.getOrganizationId(),
-                conversation.getEstablishmentId(), conversation.getId()));
+        conversationChanged.fire(ConversationChangedEvent.of(conversation));
         return true;
     }
 
@@ -93,8 +92,7 @@ public class MediaCommandServiceImpl implements MediaCommandService {
         message.recordMediaRemoved();
         messageRepository.save(message);
         conversationRepository.findById(message.getOrganizationId(), message.getConversationId())
-                .ifPresent(conversation -> conversationChanged.fire(new ConversationChangedEvent(
-                        conversation.getOrganizationId(), conversation.getEstablishmentId(), conversation.getId())));
+                .ifPresent(conversation -> conversationChanged.fire(ConversationChangedEvent.of(conversation)));
         return true;
     }
 

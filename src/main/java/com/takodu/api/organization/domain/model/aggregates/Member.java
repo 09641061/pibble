@@ -157,8 +157,13 @@ public class Member {
 
     /** Changes how the team sees the member and whether they receive appointments. */
     public void describe(String displayName, boolean bookable) {
-        this.displayName = requireDisplayName(displayName);
+        rename(displayName);
         this.bookable = bookable;
+    }
+
+    /** Changes only the name the team sees; the member may do it themselves. */
+    public void rename(String displayName) {
+        this.displayName = requireDisplayName(displayName);
     }
 
     /**

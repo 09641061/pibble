@@ -114,7 +114,7 @@ class SlotFinderTest {
                 customer, haircut.id(), member,
                 TimeRange.of(MONDAY.atTime(LocalTime.parse(start)).atZone(LIMA).toInstant(), Duration.ofHours(1)),
                 haircut.price(), AppointmentStatus.CONFIRMED, BookingSource.STAFF, new UserId(UUID.randomUUID()), null,
-                null, null, null, 0);
+                null, null, null, 0, null);
     }
 
     private static String local(Instant instant) {

@@ -28,6 +28,8 @@ public abstract class AuditableAbstractPersistenceEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /** Assemblers copy it back from the aggregate, so a merged entity keeps it; the column never changes. */
+    @Setter
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

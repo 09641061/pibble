@@ -174,7 +174,7 @@ class AvailabilityPolicyTest {
     private Appointment appointment(MemberId member, CustomerId customer, String start, AppointmentStatus status) {
         return new Appointment(new AppointmentId(UUID.randomUUID()), organization, branch, customer, haircut.id(), member,
                 at(start), haircut.price(), status, BookingSource.STAFF, new UserId(UUID.randomUUID()), null, null,
-                null, null, 0);
+                null, null, 0, null);
     }
 
     private static TimeRange at(String localTime) {

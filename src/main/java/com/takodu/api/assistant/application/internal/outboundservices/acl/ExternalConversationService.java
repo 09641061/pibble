@@ -63,4 +63,9 @@ public class ExternalConversationService {
     public void handOff(OrganizationId organizationId, ConversationId conversationId, String summary) {
         conversationsContextFacade.handOff(organizationId.value(), conversationId.value(), summary);
     }
+
+    /** The inbox shows the assistant typing while a turn runs. */
+    public void reportActivity(OrganizationId organizationId, ConversationId conversationId, boolean typing) {
+        conversationsContextFacade.reportAssistantActivity(organizationId.value(), conversationId.value(), typing);
+    }
 }

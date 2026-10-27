@@ -3,6 +3,7 @@ package com.takodu.api.conversations.interfaces.rest;
 import com.takodu.api.conversations.application.queryservices.InboxStreamQueryService;
 import com.takodu.api.conversations.domain.model.queries.StreamInboxChangesQuery;
 import com.takodu.api.conversations.interfaces.rest.resources.InboxChangeResource;
+import com.takodu.api.conversations.interfaces.rest.transform.InboxChangeResourceFromEntityAssembler;
 import com.takodu.api.shared.application.tenancy.TenantContext;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Multi;
@@ -36,14 +37,13 @@ public class InboxStreamController {
     @Produces(MediaType.SERVER_SENT_EVENTS)
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     @Operation(summary = "Follow the inbox",
-            description = "Server-sent events naming each conversation that changed in the establishments the caller sees; the app then reloads it. Reconnect and reload after a drop.")
+            description = "Server-sent events for the establishments the caller sees: each conversation that changed, with its summary for the list, when the assistant starts (assistant_typing) and stops (assistant_idle) answering one, and each appointment booked, rescheduled or cancelled (appointment_*), so calendars reload. A ping follows the subscription and repeats every 25 seconds. Reconnect and reload after a drop.")
     @APIResponse(responseCode = "200", description = "An endless event stream")
     public Multi<InboxChangeResource> stream() {
         var query = new StreamInboxChangesQuery(tenantContext.organizationId(), tenantContext.role().seesAllEstablishments(),
                 tenantContext.establishmentIds());
         var changes = inboxStreamQueryService.handle(query)
-                .map(change -> new InboxChangeResource("conversation", change.conversationId().value(),
-                        change.establishmentId().value()));
+                .map(InboxChangeResourceFromEntityAssembler::toResourceFromEntity);
         var pings = Multi.createFrom().ticks().every(PING).map(tick -> InboxChangeResource.ping());
         // The first ping tells the client the stream is subscribed; changes come first so none is missed before it.
         return Multi.createBy().merging().streams(changes, Multi.createFrom().item(InboxChangeResource.ping()), pings);

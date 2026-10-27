@@ -2,7 +2,7 @@ package com.takodu.api.conversations.application.internal.queryservices;
 
 import com.takodu.api.conversations.application.internal.eventhandlers.ConversationChangedEventHandler;
 import com.takodu.api.conversations.application.queryservices.InboxStreamQueryService;
-import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
+import com.takodu.api.conversations.domain.model.events.InboxEvent;
 import com.takodu.api.conversations.domain.model.queries.StreamInboxChangesQuery;
 import com.takodu.api.shared.application.tenancy.AccessPolicy;
 import com.takodu.api.shared.application.tenancy.Action;
@@ -25,7 +25,7 @@ public class InboxStreamQueryServiceImpl implements InboxStreamQueryService {
      * client gets a buffer instead of failing the broadcast.
      */
     @Override
-    public Multi<ConversationChangedEvent> handle(StreamInboxChangesQuery query) {
+    public Multi<InboxEvent> handle(StreamInboxChangesQuery query) {
         accessPolicy.require(Action.REPLY_IN_INBOX);
         return conversationChangedEventHandler.changes()
                 .filter(change -> change.organizationId().equals(query.organizationId())

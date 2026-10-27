@@ -28,7 +28,7 @@ public final class AppointmentPersistenceAssembler {
                 entity.getCreatedBy() == null ? null : new UserId(entity.getCreatedBy()),
                 entity.getCancelReason() == null ? null : new CancelReason(entity.getCancelReason()),
                 entity.getCancelledBy(), key(entity.getIdempotencyKey()), key(entity.getLastIdempotencyKey()),
-                entity.getVersion());
+                entity.getVersion(), entity.getCreatedAt());
     }
 
     public static AppointmentPersistenceEntity toPersistenceFromDomain(Appointment appointment) {
@@ -52,6 +52,7 @@ public final class AppointmentPersistenceAssembler {
         entity.setLastIdempotencyKey(appointment.getLastIdempotencyKey() == null ? null
                 : appointment.getLastIdempotencyKey().value());
         entity.setVersion(appointment.getVersion());
+        entity.setCreatedAt(appointment.getCreatedAt());
         return entity;
     }
 

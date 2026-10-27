@@ -19,6 +19,7 @@ import com.takodu.api.organization.domain.model.commands.InviteMemberCommand;
 import com.takodu.api.organization.domain.model.commands.RemoveMemberCommand;
 import com.takodu.api.organization.domain.model.commands.RenewInvitationCommand;
 import com.takodu.api.organization.domain.model.commands.TransferOwnershipCommand;
+import com.takodu.api.organization.domain.model.commands.RenameOwnMembershipCommand;
 import com.takodu.api.organization.domain.model.commands.UpdateMemberCommand;
 import com.takodu.api.shared.domain.exceptions.AccessDeniedException;
 
@@ -66,6 +67,13 @@ public interface MemberCommandService {
      * @throws EstablishmentNotFoundException when a staff establishment is not active in the organization
      */
     Member handle(UpdateMemberCommand command);
+
+    /**
+     * Any member renames their own membership, whatever their role and while the plan is inactive.
+     *
+     * @throws MemberNotFoundException when the membership was removed meanwhile
+     */
+    Member handle(RenameOwnMembershipCommand command);
 
     /**
      * Removes an active member or revokes a pending invitation; the person loses access on their next request.

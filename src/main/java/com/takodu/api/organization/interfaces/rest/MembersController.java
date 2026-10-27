@@ -3,10 +3,12 @@ package com.takodu.api.organization.interfaces.rest;
 import com.takodu.api.organization.application.commandservices.MemberCommandService;
 import com.takodu.api.organization.application.queryservices.MemberQueryService;
 import com.takodu.api.organization.domain.model.commands.RemoveMemberCommand;
+import com.takodu.api.organization.domain.model.commands.RenameOwnMembershipCommand;
 import com.takodu.api.organization.domain.model.commands.RenewInvitationCommand;
 import com.takodu.api.organization.domain.model.queries.GetCurrentMembersQuery;
 import com.takodu.api.organization.interfaces.rest.resources.InviteMemberResource;
 import com.takodu.api.organization.interfaces.rest.resources.MemberResource;
+import com.takodu.api.organization.interfaces.rest.resources.RenameOwnMembershipResource;
 import com.takodu.api.organization.interfaces.rest.resources.UpdateMemberResource;
 import com.takodu.api.organization.interfaces.rest.transform.InviteMemberCommandFromResourceAssembler;
 import com.takodu.api.organization.interfaces.rest.transform.MemberResourceFromEntityAssembler;
@@ -90,6 +92,19 @@ public class MembersController {
                                           @PathParam("memberId") UUID memberId) {
         var command = new RenewInvitationCommand(tenantContext.organizationId(), tenantContext.memberId(),
                 new MemberId(memberId), new IdempotencyKey(idempotencyKey));
+        return MemberResourceFromEntityAssembler.toResourceFromEntity(memberCommandService.handle(command));
+    }
+
+    @PUT
+    @Path("/me")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Rename yourself", description = "Any member. Changes the name the team sees for the caller in this organization only; other organizations keep theirs.")
+    @APIResponse(responseCode = "200", description = "Member renamed",
+            content = @Content(schema = @Schema(implementation = MemberResource.class)))
+    @APIResponse(responseCode = "400", description = "Blank or too long name")
+    public MemberResource renameSelf(@Valid RenameOwnMembershipResource resource) {
+        var command = new RenameOwnMembershipCommand(tenantContext.organizationId(), tenantContext.memberId(),
+                resource.displayName());
         return MemberResourceFromEntityAssembler.toResourceFromEntity(memberCommandService.handle(command));
     }
 

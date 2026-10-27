@@ -4,6 +4,8 @@ import com.takodu.api.assistant.application.internal.outboundservices.acl.Extern
 import com.takodu.api.assistant.application.internal.outboundservices.acl.ExternalOrganizationService;
 import com.takodu.api.assistant.domain.model.valueobjects.CustomerAppointment;
 import com.takodu.api.assistant.domain.model.valueobjects.OfferedService;
+import com.takodu.api.assistant.domain.model.valueobjects.PartOfDay;
+import com.takodu.api.assistant.domain.model.valueobjects.TimeOffer;
 import com.takodu.api.assistant.domain.services.TurnKeys;
 import com.takodu.api.shared.domain.exceptions.DomainException;
 import com.takodu.api.shared.domain.exceptions.PlanInactiveException;
@@ -17,6 +19,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -71,11 +74,15 @@ public class BookingTools {
                 + (scope.businessInfo().isEmpty() ? "" : "\nInformación del negocio:\n" + scope.businessInfo());
     }
 
-    @Tool("Busca horarios libres para un servicio en una fecha. La fecha va en formato YYYY-MM-DD.")
+    @Tool("Busca horarios libres para un servicio en una fecha. La fecha va en formato YYYY-MM-DD. Si el cliente"
+            + " pidió una franja (mañana, tarde o noche) o una hora aproximada, pásala para ver esos horarios.")
     public String findSlots(@P("Nombre del servicio") String serviceName,
                             @P("Fecha en formato YYYY-MM-DD") String date,
                             @P(value = "Nombre del profesional, si el cliente lo pidió", required = false)
-                            String staffName) {
+                            String staffName,
+                            @P(value = "Franja que pidió el cliente: mañana, tarde o noche; o una hora aproximada"
+                                    + " en formato HH:MM", required = false)
+                            String timeOfDay) {
         if (!scope.countToolCall()) return tooManyCalls();
         var service = service(serviceName);
         if (service.isEmpty()) return noSuchService();
@@ -85,10 +92,12 @@ public class BookingTools {
         } catch (DateTimeParseException e) {
             return "La fecha debe ir en formato YYYY-MM-DD.";
         }
+        var when = TimeOfDay.parse(timeOfDay);
+        if (when.isEmpty()) return "La franja debe ser mañana, tarde o noche, o una hora en formato HH:MM.";
         var member = member(service.get(), staffName);
         if (member.isEmpty()) return noSuchMember(service.get());
         try {
-            return freeTimes(service.get(), day, member.get().orElse(null));
+            return freeTimes(service.get(), day, member.get().orElse(null), when.get());
         } catch (DomainException e) {
             return refusal(e);
         }
@@ -198,17 +207,40 @@ public class BookingTools {
                 .map(Optional::of);
     }
 
-    private String freeTimes(OfferedService service, LocalDate day, MemberId member) {
-        var times = booking.fetchFreeTimes(scope.organizationId(), service.id(), scope.customerId(), day, member);
+    /** B16: at most {@link #MAX_TIMES} times, in the asked part of the day or near the asked time, else spread. */
+    private String freeTimes(OfferedService service, LocalDate day, MemberId member, TimeOfDay when) {
+        var times = booking.fetchFreeTimes(scope.organizationId(), service.id(), scope.customerId(), day, member)
+                .stream().map(time -> time.atZone(scope.zone()).toLocalTime()).toList();
         if (times.isEmpty()) return "No hay horarios libres el " + SpanishText.date(day) + ".";
-        return "Horarios libres el " + SpanishText.date(day) + ": " + times.stream().limit(MAX_TIMES)
-                .map(time -> SpanishText.time(time, scope.zone())).collect(Collectors.joining(", ")) + ".";
+        if (when.part() != null) {
+            var inPart = times.stream().filter(when.part()::contains).toList();
+            if (inPart.isEmpty()) {
+                return "No hay horarios libres el " + SpanishText.date(day) + " " + SpanishText.partOfDay(when.part())
+                        + ". Otros horarios ese día: " + listed(TimeOffer.spread(times, MAX_TIMES)) + ".";
+            }
+            return "Horarios libres el " + SpanishText.date(day) + " " + SpanishText.partOfDay(when.part()) + ": "
+                    + listed(TimeOffer.spread(inPart, MAX_TIMES)) + ".";
+        }
+        if (when.around() != null) {
+            return "Horarios libres el " + SpanishText.date(day) + " cerca de las " + SpanishText.time(when.around())
+                    + ": " + listed(TimeOffer.closestTo(times, when.around(), MAX_TIMES)) + ".";
+        }
+        var offer = TimeOffer.spread(times, MAX_TIMES);
+        return "Horarios libres el " + SpanishText.date(day) + ": " + listed(offer) + "."
+                + (offer.more() == 0 ? "" : " Para ver otros, busca con una franja o una hora aproximada.");
     }
 
-    /** The same day's free times, so the model can offer another one at once. */
+    private static String listed(TimeOffer offer) {
+        return offer.shown().stream().map(SpanishText::time).collect(Collectors.joining(", "))
+                + (offer.more() == 0 ? "" : " y " + offer.more() + " más");
+    }
+
+    /** The same day's free times nearest to the refused one, so the model can offer another one at once. */
     private String alternatives(OfferedService service, Instant asked, MemberId member) {
+        var local = asked.atZone(scope.zone());
         try {
-            return " " + freeTimes(service, asked.atZone(scope.zone()).toLocalDate(), member);
+            return " " + freeTimes(service, local.toLocalDate(), member,
+                    new TimeOfDay(null, local.toLocalTime().withSecond(0).withNano(0)));
         } catch (DomainException e) {
             return "";
         }
@@ -284,5 +316,27 @@ public class BookingTools {
     private String tooManyCalls() {
         scope.requestHandOff("El asistente no logró resolver la consulta");
         return "Ya no puedo usar más herramientas. Dile al cliente que una persona del equipo continuará.";
+    }
+
+    /** What the customer asked for within the day: a part of it, a time to be near, or neither. */
+    private record TimeOfDay(PartOfDay part, LocalTime around) {
+        private static final TimeOfDay ANY = new TimeOfDay(null, null);
+
+        /** @return empty when the text is neither a part of the day nor a time */
+        static Optional<TimeOfDay> parse(String text) {
+            if (text == null || text.isBlank()) return Optional.of(ANY);
+            var part = switch (SpanishText.plain(text).replaceFirst("^(en |por )?(la )?", "")) {
+                case "manana" -> PartOfDay.MORNING;
+                case "tarde" -> PartOfDay.AFTERNOON;
+                case "noche" -> PartOfDay.EVENING;
+                default -> null;
+            };
+            if (part != null) return Optional.of(new TimeOfDay(part, null));
+            try {
+                return Optional.of(new TimeOfDay(null, LocalTime.parse(text.strip())));
+            } catch (DateTimeParseException e) {
+                return Optional.empty();
+            }
+        }
     }
 }

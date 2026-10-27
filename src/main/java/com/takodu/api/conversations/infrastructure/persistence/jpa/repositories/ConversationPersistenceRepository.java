@@ -50,6 +50,21 @@ public class ConversationPersistenceRepository implements PanacheRepositoryBase<
         return page.page(0, limit).list();
     }
 
+    /** @return the chats awaiting a reply and the unread ones, the rule of {@code Conversation.awaitsReply} */
+    public long[] summarize(UUID organizationId, UUID establishmentId) {
+        var row = getEntityManager().createQuery("""
+                select coalesce(sum(case when c.assistantHandedOffAt is not null
+                                          or (c.unreadCount > 0 and c.lastInboundAt >= c.lastMessageAt)
+                                         then 1 else 0 end), 0),
+                       coalesce(sum(case when c.unreadCount > 0 then 1 else 0 end), 0)
+                from ConversationPersistenceEntity c
+                where c.organizationId = ?1 and c.establishmentId = ?2
+                  and (c.unreadCount > 0 or c.assistantHandedOffAt is not null)
+                """, Object[].class).setParameter(1, organizationId).setParameter(2, establishmentId)
+                .getSingleResult();
+        return new long[] {((Number) row[0]).longValue(), ((Number) row[1]).longValue()};
+    }
+
     public ConversationPersistenceEntity lockByLineAndCustomer(UUID lineId, UUID customerId) {
         return find("lineId = ?1 and customerId = ?2", lineId, customerId)
                 .withLock(LockModeType.PESSIMISTIC_WRITE)

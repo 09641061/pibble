@@ -27,6 +27,7 @@ import java.util.stream.IntStream;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
@@ -243,12 +244,14 @@ public class AppointmentsControllerTest {
         var staff = salon.hireStaff();
         salon.performedBy(salon.owner(), staff);
         String id = book(salon.owner(), UUID.randomUUID(), body(salon, salon.owner().memberId(), TestSalon.at(clock, 1, "10:00")))
-                .extract().path("id");
+                .body("createdAt", notNullValue()).extract().path("id");
+        String bookedAt = get(salon.owner(), id).extract().path("createdAt");
         var later = TestSalon.at(clock, 2, "16:00");
 
         transition(salon.owner(), id, "reschedulings", UUID.randomUUID(),
                 Map.of("staffMemberId", staff.memberId(), "start", later.toString()))
                 .statusCode(200)
+                .body("createdAt", equalTo(bookedAt))
                 .body("start", equalTo(later.toString()))
                 .body("end", equalTo(later.plus(Duration.ofHours(1)).toString()))
                 .body("staffMemberId", equalTo(staff.memberId().toString()));

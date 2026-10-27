@@ -64,6 +64,25 @@ class MediaControllerTest {
     }
 
     @Test
+    void theBrowserKeepsThePhotoAndRevalidatesWithItsETag() {
+        var salon = TestSalon.open();
+        var photo = customerSendsPhoto(salon, salon.establishmentId(), PHOTO);
+        download(photo);
+
+        String tag = media(salon.owner(), photo.messageId()).statusCode(200)
+                .header("Cache-Control", equalTo("private, max-age=86400"))
+                .header("ETag", equalTo("\"" + photo.messageId() + "\""))
+                .extract().header("ETag");
+
+        var unchanged = given().spec(salon.owner().spec()).header("If-None-Match", tag)
+                .get("/api/v1/media/" + photo.messageId()).then().statusCode(304)
+                .header("ETag", equalTo(tag)).extract().asByteArray();
+        assertArrayEquals(new byte[0], unchanged);
+        given().spec(salon.owner().spec()).header("If-None-Match", "\"something-else\"")
+                .get("/api/v1/media/" + photo.messageId()).then().statusCode(200);
+    }
+
+    @Test
     void photoStillDownloadingIsNotReady() {
         var salon = TestSalon.open();
         var photo = customerSendsPhoto(salon, salon.establishmentId(), PHOTO);
