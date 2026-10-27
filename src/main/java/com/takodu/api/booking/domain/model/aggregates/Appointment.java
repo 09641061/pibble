@@ -49,6 +49,8 @@ public class Appointment {
     private final IdempotencyKey idempotencyKey;
     private IdempotencyKey lastIdempotencyKey;
     private final int version;
+    /** When it was booked; null until it is stored. */
+    private final Instant createdAt;
 
     /**
      * B8: the price and currency are copied from the service now and never change afterwards.
@@ -62,7 +64,7 @@ public class Appointment {
             throw new IllegalArgumentException("Staff bookings record who created them");
         return new Appointment(null, organizationId, service.establishmentId(), customerId, service.id(),
                 staffMemberId, TimeRange.of(start, service.duration()), service.price(), AppointmentStatus.CONFIRMED,
-                source, createdBy, null, null, idempotencyKey, null, 0);
+                source, createdBy, null, null, idempotencyKey, null, 0, null);
     }
 
     /** Rehydration constructor; only persistence assemblers call it. */
@@ -70,7 +72,7 @@ public class Appointment {
                        CustomerId customerId, ServiceId serviceId, MemberId staffMemberId, TimeRange range, Money price,
                        AppointmentStatus status, BookingSource source, UserId createdBy, CancelReason cancelReason,
                        CancelledBy cancelledBy, IdempotencyKey idempotencyKey, IdempotencyKey lastIdempotencyKey,
-                       int version) {
+                       int version, Instant createdAt) {
         this.id = id;
         this.organizationId = Objects.requireNonNull(organizationId, "organizationId is required");
         this.establishmentId = Objects.requireNonNull(establishmentId, "establishmentId is required");
@@ -87,6 +89,7 @@ public class Appointment {
         this.idempotencyKey = idempotencyKey;
         this.lastIdempotencyKey = lastIdempotencyKey;
         this.version = version;
+        this.createdAt = createdAt;
     }
 
     /**

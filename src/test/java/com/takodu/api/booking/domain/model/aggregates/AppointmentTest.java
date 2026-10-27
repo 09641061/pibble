@@ -163,7 +163,7 @@ class AppointmentTest {
         return new Appointment(new AppointmentId(UUID.randomUUID()), booked.getOrganizationId(),
                 booked.getEstablishmentId(), booked.getCustomerId(), booked.getServiceId(), booked.getStaffMemberId(),
                 booked.getRange(), booked.getPrice(), booked.getStatus(), booked.getSource(), booked.getCreatedBy(), null,
-                null, booked.getIdempotencyKey(), null, 0);
+                null, booked.getIdempotencyKey(), null, 0, null);
     }
 
     private static IdempotencyKey key() {
