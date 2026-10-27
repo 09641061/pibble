@@ -37,7 +37,7 @@ public class InboxStreamController {
     @Produces(MediaType.SERVER_SENT_EVENTS)
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     @Operation(summary = "Follow the inbox",
-            description = "Server-sent events for the establishments the caller sees: each conversation that changed, with its summary for the list, and when the assistant starts (assistant_typing) and stops (assistant_idle) answering one. A ping follows the subscription and repeats every 25 seconds. Reconnect and reload after a drop.")
+            description = "Server-sent events for the establishments the caller sees: each conversation that changed, with its summary for the list, when the assistant starts (assistant_typing) and stops (assistant_idle) answering one, and each appointment booked, rescheduled or cancelled (appointment_*), so calendars reload. A ping follows the subscription and repeats every 25 seconds. Reconnect and reload after a drop.")
     @APIResponse(responseCode = "200", description = "An endless event stream")
     public Multi<InboxChangeResource> stream() {
         var query = new StreamInboxChangesQuery(tenantContext.organizationId(), tenantContext.role().seesAllEstablishments(),

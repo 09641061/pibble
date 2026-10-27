@@ -6,6 +6,7 @@ import com.takodu.api.assistant.AssistantRows;
 import com.takodu.api.assistant.TestAssistant;
 import com.takodu.api.assistant.application.internal.jobs.TurnWorker;
 import com.takodu.api.assistant.infrastructure.llm.ScriptedChatModel;
+import com.takodu.api.booking.interfaces.rest.AppointmentsControllerTest;
 import com.takodu.api.conversations.TestWhatsapp;
 import com.takodu.api.shared.testing.TestSalon;
 import com.takodu.api.shared.testing.TestTenant;
@@ -128,6 +129,25 @@ class InboxStreamControllerTest {
                 seen.add(event.get("type").asText());
             }
             assertEquals(List.of("assistant_typing", "conversation", "assistant_idle"), seen);
+        }
+    }
+
+    @Test
+    void calendarsHearOfNewAppointmentsInTheirEstablishments() throws Exception {
+        var salon = TestSalon.open();
+        var staff = salon.hireStaff();
+        var start = java.time.LocalDate.now(TestSalon.LIMA).plusDays(2).atTime(10, 0).atZone(TestSalon.LIMA)
+                .toInstant();
+
+        try (var events = Events.follow(stream, staff)) {
+            String appointmentId = AppointmentsControllerTest.book(salon.owner(), UUID.randomUUID(),
+                    AppointmentsControllerTest.body(salon, salon.owner().memberId(), start))
+                    .statusCode(201).extract().path("id");
+
+            var event = events.next();
+            assertEquals("appointment_booked", event.get("type").asText());
+            assertEquals(appointmentId, event.get("appointmentId").asText());
+            assertEquals(salon.establishmentId().toString(), event.get("establishmentId").asText());
         }
     }
 
