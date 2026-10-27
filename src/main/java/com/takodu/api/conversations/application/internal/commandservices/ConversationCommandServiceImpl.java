@@ -8,7 +8,9 @@ import com.takodu.api.conversations.domain.model.commands.AssignConversationComm
 import com.takodu.api.conversations.domain.model.commands.HandOffConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
 import com.takodu.api.conversations.domain.model.commands.PauseAssistantCommand;
+import com.takodu.api.conversations.domain.model.commands.ReportAssistantActivityCommand;
 import com.takodu.api.conversations.domain.model.commands.ResumeAssistantCommand;
+import com.takodu.api.conversations.domain.model.events.AssistantActivityEvent;
 import com.takodu.api.conversations.domain.model.events.ConversationChangedEvent;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
 import com.takodu.api.conversations.domain.repositories.ConversationRepository;
@@ -27,16 +29,18 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
     private final ExternalOrganizationService externalOrganizationService;
     private final AccessPolicy accessPolicy;
     private final Event<ConversationChangedEvent> conversationChanged;
+    private final Event<AssistantActivityEvent> assistantActivity;
     private final Clock clock;
 
     public ConversationCommandServiceImpl(ConversationRepository conversationRepository,
                                           ExternalOrganizationService externalOrganizationService,
                                           AccessPolicy accessPolicy, Event<ConversationChangedEvent> conversationChanged,
-                                          Clock clock) {
+                                          Event<AssistantActivityEvent> assistantActivity, Clock clock) {
         this.conversationRepository = conversationRepository;
         this.externalOrganizationService = externalOrganizationService;
         this.accessPolicy = accessPolicy;
         this.conversationChanged = conversationChanged;
+        this.assistantActivity = assistantActivity;
         this.clock = clock;
     }
 
@@ -86,11 +90,18 @@ public class ConversationCommandServiceImpl implements ConversationCommandServic
         return save(conversation);
     }
 
+    @Override
+    public void handle(ReportAssistantActivityCommand command) {
+        conversationRepository.findById(command.organizationId(), command.conversationId())
+                .ifPresent(conversation -> assistantActivity.fire(new AssistantActivityEvent(
+                        conversation.getOrganizationId(), conversation.getEstablishmentId(), conversation.getId(),
+                        command.typing())));
+    }
+
     /** Other members' inboxes follow the change (W8, W9, A3). */
     private Conversation save(Conversation conversation) {
         var saved = conversationRepository.save(conversation);
-        conversationChanged.fire(new ConversationChangedEvent(saved.getOrganizationId(), saved.getEstablishmentId(),
-                saved.getId()));
+        conversationChanged.fire(ConversationChangedEvent.of(saved));
         return saved;
     }
 

@@ -77,8 +77,8 @@ public class WhatsappWebhookCommandServiceImpl implements WhatsappWebhookCommand
                 case DisconnectAccountLinesCommand disconnect -> record(disconnect);
                 case RecordTemplateStatusCommand template -> record(template);
             };
-            conversation.ifPresent(found -> changed.putIfAbsent(found.getId(), new ConversationChangedEvent(
-                    found.getOrganizationId(), found.getEstablishmentId(), found.getId())));
+            // The last fact of a conversation wins, so its summary is the one the transaction commits.
+            conversation.ifPresent(found -> changed.put(found.getId(), ConversationChangedEvent.of(found)));
         }
         changed.values().forEach(conversationChanged::fire);
     }

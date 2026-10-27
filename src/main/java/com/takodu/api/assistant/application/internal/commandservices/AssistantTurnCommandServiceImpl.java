@@ -95,7 +95,7 @@ public class AssistantTurnCommandServiceImpl implements AssistantTurnCommandServ
     public boolean handle(RunNextTurnCommand command) {
         var claimed = QuarkusTransaction.requiringNew().call(() -> claim(command.now()));
         if (claimed.isEmpty()) return false;
-        if (claimed.get().turn().getStatus() == TurnStatus.RUNNING) inOwnRequestContext(() -> run(claimed.get()));
+        if (claimed.get().turn().getStatus() == TurnStatus.RUNNING) inOwnRequestContext(() -> runShown(claimed.get()));
         return true;
     }
 
@@ -139,6 +139,26 @@ public class AssistantTurnCommandServiceImpl implements AssistantTurnCommandServ
     private Optional<Claim> skipped(AssistantTurn turn, String reason, Instant now) {
         turn.skip(reason, now);
         return Optional.of(new Claim(assistantTurnRepository.save(turn), null, null));
+    }
+
+    /** The inbox shows the assistant typing from the claim until the turn is done, failed or dropped. */
+    private void runShown(Claim claim) {
+        show(claim.turn(), true);
+        try {
+            run(claim);
+        } finally {
+            show(claim.turn(), false);
+        }
+    }
+
+    /** Best effort: the inbox only loses the typing hint, never the turn. */
+    private void show(AssistantTurn turn, boolean typing) {
+        try {
+            externalConversationService.reportActivity(turn.getOrganizationId(), turn.getConversationId(), typing);
+        } catch (RuntimeException e) {
+            Log.warnf("Assistant activity of turn %s not shown: %s", turn.getId().value(),
+                    e.getClass().getSimpleName());
+        }
     }
 
     /**

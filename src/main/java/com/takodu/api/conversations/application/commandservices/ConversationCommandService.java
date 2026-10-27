@@ -6,6 +6,7 @@ import com.takodu.api.conversations.domain.exceptions.MemberNotFoundException;
 import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.commands.AssignConversationCommand;
 import com.takodu.api.conversations.domain.model.commands.HandOffConversationCommand;
+import com.takodu.api.conversations.domain.model.commands.ReportAssistantActivityCommand;
 import com.takodu.api.conversations.domain.model.commands.MarkConversationReadCommand;
 import com.takodu.api.conversations.domain.model.commands.PauseAssistantCommand;
 import com.takodu.api.conversations.domain.model.commands.ResumeAssistantCommand;
@@ -50,4 +51,10 @@ public interface ConversationCommandService {
      * @throws ConversationNotFoundException when the conversation is not in the organization
      */
     Conversation handle(HandOffConversationCommand command);
+
+    /**
+     * Tells the open inboxes that the assistant started or finished answering the chat; changes nothing. Runs without
+     * a caller or a transaction, for the assistant's turn. A conversation outside the organization is ignored.
+     */
+    void handle(ReportAssistantActivityCommand command);
 }

@@ -6,6 +6,7 @@ import com.takodu.api.conversations.application.queryservices.ConversationQueryS
 import com.takodu.api.conversations.application.queryservices.MessageQueryService;
 import com.takodu.api.conversations.domain.model.aggregates.Message;
 import com.takodu.api.conversations.domain.model.commands.HandOffConversationCommand;
+import com.takodu.api.conversations.domain.model.commands.ReportAssistantActivityCommand;
 import com.takodu.api.conversations.domain.model.commands.SendAssistantReplyCommand;
 import com.takodu.api.conversations.domain.model.queries.GetConversationForAssistantQuery;
 import com.takodu.api.conversations.domain.model.queries.GetRecentMessagesQuery;
@@ -77,6 +78,12 @@ public class ConversationsContextFacadeImpl implements ConversationsContextFacad
     public void handOff(UUID organizationId, UUID conversationId, String summary) {
         conversationCommandService.handle(new HandOffConversationCommand(new OrganizationId(organizationId),
                 new ConversationId(conversationId), summary));
+    }
+
+    @Override
+    public void reportAssistantActivity(UUID organizationId, UUID conversationId, boolean typing) {
+        conversationCommandService.handle(new ReportAssistantActivityCommand(new OrganizationId(organizationId),
+                new ConversationId(conversationId), typing));
     }
 
     /** The choices as the customer saw them, so the assistant knows what a tap answers. */

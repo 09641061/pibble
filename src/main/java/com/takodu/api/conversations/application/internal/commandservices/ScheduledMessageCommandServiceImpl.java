@@ -172,8 +172,7 @@ public class ScheduledMessageCommandServiceImpl implements ScheduledMessageComma
         conversationRepository.save(conversation);
         notification.markSent(message.getId());
         outboundMessageQueued.fire(new OutboundMessageQueuedEvent(message.getId()));
-        conversationChanged.fire(new ConversationChangedEvent(conversation.getOrganizationId(),
-                conversation.getEstablishmentId(), conversation.getId()));
+        conversationChanged.fire(ConversationChangedEvent.of(conversation));
     }
 
     private static Optional<ScheduledMessage> kindOf(List<ScheduledMessage> notifications, NotificationKind kind) {

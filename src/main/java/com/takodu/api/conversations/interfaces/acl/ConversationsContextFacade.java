@@ -29,4 +29,7 @@ public interface ConversationsContextFacade {
 
     /** A7: pauses the assistant until staff resume it and leaves the chat unread with the summary. */
     void handOff(UUID organizationId, UUID conversationId, String summary);
+
+    /** Shows the open inboxes that the assistant is answering the chat ({@code typing}) or stopped; changes nothing. */
+    void reportAssistantActivity(UUID organizationId, UUID conversationId, boolean typing);
 }
