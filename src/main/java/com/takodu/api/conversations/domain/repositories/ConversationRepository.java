@@ -3,6 +3,7 @@ package com.takodu.api.conversations.domain.repositories;
 import com.takodu.api.conversations.domain.model.aggregates.Conversation;
 import com.takodu.api.conversations.domain.model.aggregates.WhatsappLine;
 import com.takodu.api.conversations.domain.model.valueobjects.ConversationId;
+import com.takodu.api.conversations.domain.model.valueobjects.InboxSummary;
 import com.takodu.api.conversations.domain.model.valueobjects.PageCursor;
 import com.takodu.api.shared.domain.model.valueobjects.CustomerId;
 import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
@@ -33,4 +34,7 @@ public interface ConversationRepository {
                                            PageCursor after, int limit);
 
     Conversation save(Conversation conversation);
+
+    /** @param establishmentId an establishment the caller checked belongs to the organization */
+    InboxSummary summarize(OrganizationId organizationId, EstablishmentId establishmentId);
 }

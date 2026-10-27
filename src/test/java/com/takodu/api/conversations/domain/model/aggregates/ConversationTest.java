@@ -156,6 +156,26 @@ class ConversationTest {
         assertFalse(conversation.alreadyApplied(new IdempotencyKey(UUID.randomUUID())));
     }
 
+    @Test
+    void awaitsReplyWhileTheCustomerHasTheLastUnreadWord() {
+        var conversation = start();
+        conversation.recordInbound(NOW);
+        assertTrue(conversation.awaitsReply());
+
+        conversation.recordAssistantOutbound(NOW.plusSeconds(10));
+        assertFalse(conversation.awaitsReply());
+        assertEquals(1, conversation.getUnreadCount());
+
+        conversation.recordInbound(NOW.plusSeconds(20));
+        assertTrue(conversation.awaitsReply());
+
+        conversation.recordHumanOutbound(NOW.plusSeconds(30));
+        assertFalse(conversation.awaitsReply());
+
+        conversation.handOff("Quiere hablar con una persona", NOW.plusSeconds(40));
+        assertTrue(conversation.awaitsReply());
+    }
+
     private static Conversation start() {
         var line = new WhatsappLine(new WhatsappLineId(UUID.randomUUID()), new OrganizationId(UUID.randomUUID()),
                 new EstablishmentId(UUID.randomUUID()), "1", "2", "+51", new EncryptedToken("t"), LineMode.COEXISTENCE,

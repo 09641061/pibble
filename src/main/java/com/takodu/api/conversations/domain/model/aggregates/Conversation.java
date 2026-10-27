@@ -175,6 +175,14 @@ public class Conversation {
                 || assistantPausedUntil != null && now.isBefore(assistantPausedUntil);
     }
 
+    /**
+     * The chat waits for a person: the assistant handed it off (A7), or the customer's messages are unread and nobody,
+     * not even the assistant, wrote after them. {@code ConversationRepository.summarize} counts the same rule.
+     */
+    public boolean awaitsReply() {
+        return isHandedOff() || unreadCount > 0 && lastInboundAt != null && !lastInboundAt.isBefore(lastMessageAt);
+    }
+
     /** W8 */
     public void markRead() {
         unreadCount = 0;

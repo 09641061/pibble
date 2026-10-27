@@ -3,6 +3,8 @@ package com.takodu.api.conversations.application.queryservices;
 import com.takodu.api.conversations.domain.model.queries.GetConversationByIdQuery;
 import com.takodu.api.conversations.domain.model.queries.GetConversationForAssistantQuery;
 import com.takodu.api.conversations.domain.model.queries.GetConversationsByEstablishmentQuery;
+import com.takodu.api.conversations.domain.model.queries.GetInboxSummaryQuery;
+import com.takodu.api.conversations.domain.model.valueobjects.InboxSummary;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,4 +29,12 @@ public interface ConversationQueryService {
 
     /** @return empty when the conversation is not in the organization */
     Optional<AssistantConversation> handle(GetConversationForAssistantQuery query);
+
+    /**
+     * @return the chats that wait for a person and the unread ones
+     * @throws com.takodu.api.conversations.domain.exceptions.EstablishmentNotFoundException when the establishment is
+     *         not in the organization
+     * @throws com.takodu.api.shared.domain.exceptions.AccessDeniedException when staff are not assigned to it
+     */
+    InboxSummary handle(GetInboxSummaryQuery query);
 }
