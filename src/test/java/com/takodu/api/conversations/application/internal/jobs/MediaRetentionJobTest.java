@@ -73,6 +73,9 @@ class MediaRetentionJobTest {
         assertNull(row(deleted).get("media_path"));
         assertFalse(Files.exists(deletedFile));
         media(salon.owner(), deleted.messageId()).statusCode(404).body("code", equalTo("MEDIA_REMOVED"));
+        given().spec(salon.owner().spec())
+                .header("If-None-Match", "\"" + deleted.messageId() + "\"").get("/api/v1/media/" + deleted.messageId())
+                .then().statusCode(404).body("code", equalTo("MEDIA_REMOVED"));
         assertEquals("ready", row(kept).get("media_status"));
         assertTrue(Files.exists(mediaDir.resolve(kept.path())));
         media(salon.owner(), kept.messageId()).statusCode(200);
