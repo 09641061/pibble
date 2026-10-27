@@ -6,6 +6,7 @@ import com.takodu.api.shared.domain.model.valueobjects.EstablishmentId;
 import com.takodu.api.shared.domain.model.valueobjects.OrganizationId;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Something the inbox shows changed: a message arrived or was sent, a status moved, the chat was read or assigned.
@@ -21,11 +22,20 @@ public record ConversationChangedEvent(OrganizationId organizationId, Establishm
                                        boolean assistantHandedOff, boolean assistantPausedManually)
         implements InboxEvent {
 
-    /** @param conversation the conversation after its change, before it is saved or after */
+    /**
+     * Instants are cut to microseconds, as PostgreSQL stores them, so the stream and a reload agree.
+     *
+     * @param conversation the conversation after its change, before it is saved or after
+     */
     public static ConversationChangedEvent of(Conversation conversation) {
         return new ConversationChangedEvent(conversation.getOrganizationId(), conversation.getEstablishmentId(),
-                conversation.getId(), conversation.getLastMessageAt(), conversation.getLastInboundAt(),
-                conversation.getUnreadCount(), conversation.windowClosesAt(), conversation.getAssistantPausedUntil(),
-                conversation.isHandedOff(), conversation.isManuallyPaused());
+                conversation.getId(), micros(conversation.getLastMessageAt()), micros(conversation.getLastInboundAt()),
+                conversation.getUnreadCount(), micros(conversation.windowClosesAt()),
+                micros(conversation.getAssistantPausedUntil()), conversation.isHandedOff(),
+                conversation.isManuallyPaused());
+    }
+
+    private static Instant micros(Instant instant) {
+        return instant == null ? null : instant.truncatedTo(ChronoUnit.MICROS);
     }
 }
